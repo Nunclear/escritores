@@ -1,4 +1,4 @@
-package com.nunclear.escritores.escritores;
+package com.nunclear.escritores;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
