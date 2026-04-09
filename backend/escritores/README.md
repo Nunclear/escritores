@@ -5,7 +5,7 @@ Una plataforma profesional y escalable para la gestión y publicación de histor
 ## Características
 
 ✅ **Gestión de Usuarios**
-- Registro e inicio de sesión
+- Registro e  inicio de sesión
 - Perfiles de usuario con avatar y biografía
 - Cambio de contraseña seguro
 - Niveles de acceso (administrador, moderador, usuario, lector)
