@@ -52,7 +52,10 @@ public class SecurityConfig {
                                 "/arcs/*",
                                 "/arcs/story/*",
                                 "/volumes/*",
-                                "/volumes/story/*"
+                                "/volumes/story/*",
+                                "/characters/*",
+                                "/characters/story/*",
+                                "/characters/search"
                         ).permitAll()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
