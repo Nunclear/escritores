@@ -50,7 +50,9 @@ public class SecurityConfig {
                                 "/chapters/story/*/published",
                                 "/chapters/search",
                                 "/arcs/*",
-                                "/arcs/story/*"
+                                "/arcs/story/*",
+                                "/volumes/*",
+                                "/volumes/story/*"
                         ).permitAll()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
