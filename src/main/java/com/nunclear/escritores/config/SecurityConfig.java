@@ -44,7 +44,11 @@ public class SecurityConfig {
                                 "/stories/*",
                                 "/stories/slug/*",
                                 "/stories/search",
-                                "/stories/user/*"
+                                "/stories/user/*",
+                                "/chapters/*",
+                                "/chapters/story/*",
+                                "/chapters/story/*/published",
+                                "/chapters/search"
                         ).permitAll()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()

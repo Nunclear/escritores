@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface StoryRepository extends JpaRepository<Story, Integer> {
@@ -81,4 +82,5 @@ public interface StoryRepository extends JpaRepository<Story, Integer> {
             Integer ownerUserId,
             Pageable pageable
     );
+    List<Story> findByOwnerUserId(Integer ownerUserId);
 }
