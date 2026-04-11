@@ -1,4 +1,8 @@
 package com.nunclear.escritores.dto.response;
 
-public class AdminUserByStateItemResponse {
+public record AdminUserByStateItemResponse(
+        Integer id,
+        String loginName,
+        String accountState
+) {
 }

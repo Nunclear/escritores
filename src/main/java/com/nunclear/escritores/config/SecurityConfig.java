@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/users/*/public-profile",
                                 "/users/*/stories"
                         ).permitAll()
+                        .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

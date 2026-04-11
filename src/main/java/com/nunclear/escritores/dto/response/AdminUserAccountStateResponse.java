@@ -1,4 +1,10 @@
 package com.nunclear.escritores.dto.response;
 
-public class AdminUserAccountStateResponse {
+import java.time.LocalDateTime;
+
+public record AdminUserAccountStateResponse(
+        Integer id,
+        String accountState,
+        LocalDateTime updatedAt
+) {
 }

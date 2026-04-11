@@ -1,4 +1,8 @@
 package com.nunclear.escritores.dto.response;
 
-public class UserHistoryResponse {
+import java.util.List;
+
+public record UserHistoryResponse(
+        List<UserHistoryEventResponse> events
+) {
 }

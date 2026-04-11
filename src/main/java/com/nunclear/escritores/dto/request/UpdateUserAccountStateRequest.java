@@ -1,4 +1,9 @@
 package com.nunclear.escritores.dto.request;
 
-public class UpdateUserAccountStateRequest {
+import jakarta.validation.constraints.NotBlank;
+
+public record UpdateUserAccountStateRequest(
+        @NotBlank
+        String accountState
+) {
 }

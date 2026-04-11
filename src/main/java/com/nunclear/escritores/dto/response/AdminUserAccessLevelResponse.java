@@ -1,4 +1,10 @@
 package com.nunclear.escritores.dto.response;
 
-public class AdminUserAccessLevelResponse {
+import java.time.LocalDateTime;
+
+public record AdminUserAccessLevelResponse(
+        Integer id,
+        String accessLevel,
+        LocalDateTime updatedAt
+) {
 }
