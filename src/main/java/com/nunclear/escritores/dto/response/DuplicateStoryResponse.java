@@ -1,4 +1,9 @@
 package com.nunclear.escritores.dto.response;
 
-public class DuplicateStoryResponse {
+public record DuplicateStoryResponse(
+        Integer id,
+        Integer sourceStoryId,
+        String title,
+        String publicationState
+) {
 }

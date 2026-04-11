@@ -1,4 +1,9 @@
 package com.nunclear.escritores.dto.response;
 
-public class UserStorySummaryResponse {
+public record UserStorySummaryResponse(
+        Integer id,
+        Integer ownerUserId,
+        String title,
+        String publicationState
+) {
 }

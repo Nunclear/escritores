@@ -1,4 +1,10 @@
 package com.nunclear.escritores.dto.response;
 
-public class StoryPublicationResponse {
+import java.time.LocalDateTime;
+
+public record StoryPublicationResponse(
+        Integer id,
+        String publicationState,
+        LocalDateTime publishedAt
+) {
 }

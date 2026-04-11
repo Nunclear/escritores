@@ -1,4 +1,9 @@
 package com.nunclear.escritores.dto.response;
 
-public class StoryArchiveResponse {
+import java.time.LocalDateTime;
+
+public record StoryArchiveResponse(
+        Integer id,
+        LocalDateTime archivedAt
+) {
 }

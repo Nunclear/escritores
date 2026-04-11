@@ -1,4 +1,10 @@
 package com.nunclear.escritores.dto.response;
 
-public class ArchivedStoryItemResponse {
+import java.time.LocalDateTime;
+
+public record ArchivedStoryItemResponse(
+        Integer id,
+        String title,
+        LocalDateTime archivedAt
+) {
 }

@@ -39,7 +39,12 @@ public class SecurityConfig {
                                 "/auth/verify-email",
                                 "/users/*",
                                 "/users/*/public-profile",
-                                "/users/*/stories"
+                                "/users/*/stories",
+                                "/stories",
+                                "/stories/*",
+                                "/stories/slug/*",
+                                "/stories/search",
+                                "/stories/user/*"
                         ).permitAll()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
