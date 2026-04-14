@@ -55,7 +55,16 @@ public class SecurityConfig {
                                 "/volumes/story/*",
                                 "/characters/*",
                                 "/characters/story/*",
-                                "/characters/search"
+                                "/characters/search",
+                                "/skills/*",
+                                "/skills/story/*",
+                                "/skills/search",
+                                "/character-skills/character/*",
+                                "/character-skills/skill/*",
+                                "/events/*",
+                                "/events/story/*",
+                                "/events/chapter/*",
+                                "/events/search"
                         ).permitAll()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
