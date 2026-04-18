@@ -64,8 +64,11 @@ public class SecurityConfig {
                                 "/events/*",
                                 "/events/story/*",
                                 "/events/chapter/*",
-                                "/events/search"
+                                "/events/search",
+                                "/items/*",
+                                "/items/story/*"
                         ).permitAll()
+                        .requestMatchers("/ideas/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
                 )
