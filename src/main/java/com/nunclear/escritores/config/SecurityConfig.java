@@ -66,7 +66,10 @@ public class SecurityConfig {
                                 "/events/chapter/*",
                                 "/events/search",
                                 "/items/*",
-                                "/items/story/*"
+                                "/items/story/*",
+                                "/media/*",
+                                "/media/chapter/*",
+                                "/media/*/download"
                         ).permitAll()
                         .requestMatchers("/ideas/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
