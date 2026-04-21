@@ -1,7 +1,7 @@
 package com.nunclear.escritores.enums;
 
 public enum AccessLevel {
-    user,
-    moderator,
-    admin
+    USER,
+    MODERATOR,
+    ADMIN
 }

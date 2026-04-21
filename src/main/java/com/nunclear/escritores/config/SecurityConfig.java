@@ -24,7 +24,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -69,7 +69,11 @@ public class SecurityConfig {
                                 "/items/story/*",
                                 "/media/*",
                                 "/media/chapter/*",
-                                "/media/*/download"
+                                "/media/*/download",
+                                "/comments/*",
+                                "/comments/story/*",
+                                "/comments/chapter/*",
+                                "/comments/*/replies"
                         ).permitAll()
                         .requestMatchers("/ideas/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
@@ -86,7 +90,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) {
         return configuration.getAuthenticationManager();
     }
 }
