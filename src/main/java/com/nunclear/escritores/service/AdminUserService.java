@@ -16,6 +16,7 @@ import com.nunclear.escritores.repository.UserSessionRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,10 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
+
+    private static final String FIELD_ACCESS_LEVEL = "accessLevel";
+    private static final String FIELD_ACCOUNT_STATE = "accountState";
+    private static final String FIELD_CREATED_AT = "createdAt";
 
     private final AppUserRepository appUserRepository;
     private final UserChangeHistoryRepository userChangeHistoryRepository;
@@ -46,7 +51,7 @@ public class AdminUserService {
 
         saveHistory(
                 saved.getId(),
-                "accessLevel",
+                FIELD_ACCESS_LEVEL,
                 oldAccessLevel.name(),
                 newAccessLevel.name(),
                 adminUser.getId()
@@ -80,7 +85,7 @@ public class AdminUserService {
 
         saveHistory(
                 saved.getId(),
-                "accountState",
+                FIELD_ACCOUNT_STATE,
                 oldAccountState.name(),
                 newAccountState.name(),
                 adminUser.getId()
@@ -100,7 +105,7 @@ public class AdminUserService {
             String sort
     ) {
         AccessLevel parsedAccessLevel = parseAccessLevel(accessLevel);
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "createdAt,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? FIELD_CREATED_AT + ",desc" : sort);
 
         Page<AppUser> result = appUserRepository.findByAccessLevelAndDeletedAtIsNull(parsedAccessLevel, pageable);
 
@@ -128,7 +133,7 @@ public class AdminUserService {
             String sort
     ) {
         AccountState parsedAccountState = parseAccountState(accountState);
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "createdAt,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? FIELD_CREATED_AT + ",desc" : sort);
 
         Page<AppUser> result = appUserRepository.findByAccountStateAndDeletedAtIsNull(parsedAccountState, pageable);
 
@@ -206,7 +211,13 @@ public class AdminUserService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
@@ -244,12 +255,12 @@ public class AdminUserService {
 
     private String mapSortField(String field) {
         return switch (field) {
-            case "createdAt" -> "createdAt";
+            case FIELD_CREATED_AT -> FIELD_CREATED_AT;
             case "updatedAt" -> "updatedAt";
             case "loginName" -> "loginName";
-            case "accessLevel" -> "accessLevel";
-            case "accountState" -> "accountState";
-            default -> "createdAt";
+            case FIELD_ACCESS_LEVEL -> FIELD_ACCESS_LEVEL;
+            case FIELD_ACCOUNT_STATE -> FIELD_ACCOUNT_STATE;
+            default -> FIELD_CREATED_AT;
         };
     }
 }

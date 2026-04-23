@@ -17,6 +17,7 @@ import com.nunclear.escritores.repository.StoryRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,12 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ArcService {
+
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
+    private static final String SORT_POSITION_INDEX = "positionIndex";
+    private static final String SORT_CREATED_AT = "createdAt";
+    private static final String SORT_UPDATED_AT = "updatedAt";
+    private static final String SORT_TITLE = "title";
 
     private final ArcRepository arcRepository;
     private final StoryRepository storyRepository;
@@ -56,7 +63,7 @@ public class ArcService {
                 .orElseThrow(() -> new ResourceNotFoundException("Arco no encontrado"));
 
         Story story = storyRepository.findById(arc.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -71,11 +78,16 @@ public class ArcService {
 
     public PageResponse<ArcListItemResponse> getArcsByStory(Integer storyId, int page, int size, String sort) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "positionIndex,asc" : sort);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? SORT_POSITION_INDEX + ",asc" : sort
+        );
+
         Page<Arc> result = arcRepository.findByStoryId(storyId, pageable);
 
         return new PageResponse<>(
@@ -148,7 +160,7 @@ public class ArcService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -173,14 +185,14 @@ public class ArcService {
 
         AppUser currentUser = tryGetAuthenticatedUser();
         if (currentUser == null) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
 
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
         boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
 
         if (!isOwner && !isModeratorOrAdmin) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
     }
 
@@ -189,7 +201,13 @@ public class ArcService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
@@ -200,14 +218,18 @@ public class ArcService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private Pageable buildPageable(int page, int size, String sort) {
@@ -222,11 +244,11 @@ public class ArcService {
 
     private String mapSortField(String field) {
         return switch (field) {
-            case "title" -> "title";
-            case "createdAt" -> "createdAt";
-            case "updatedAt" -> "updatedAt";
-            case "positionIndex" -> "positionIndex";
-            default -> "positionIndex";
+            case SORT_TITLE -> SORT_TITLE;
+            case SORT_CREATED_AT -> SORT_CREATED_AT;
+            case SORT_UPDATED_AT -> SORT_UPDATED_AT;
+            case SORT_POSITION_INDEX -> SORT_POSITION_INDEX;
+            default -> SORT_POSITION_INDEX;
         };
     }
 }

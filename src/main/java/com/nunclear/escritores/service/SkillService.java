@@ -14,12 +14,18 @@ import com.nunclear.escritores.repository.StoryRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class SkillService {
+
+    // Mala práctica corregida:
+    // repetición de literales ("magic strings").
+    // Tipo: duplicación de cadenas / baja mantenibilidad.
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
 
     private final SkillRepository skillRepository;
     private final StoryRepository storyRepository;
@@ -51,7 +57,7 @@ public class SkillService {
                 .orElseThrow(() -> new ResourceNotFoundException("Habilidad no encontrada"));
 
         Story story = storyRepository.findById(skill.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -72,7 +78,7 @@ public class SkillService {
             String sort
     ) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -140,7 +146,7 @@ public class SkillService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -155,7 +161,7 @@ public class SkillService {
 
     private void validateReadAccess(Story story) {
         if (!canReadStory(story)) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
     }
 
@@ -165,10 +171,14 @@ public class SkillService {
                         && "published".equalsIgnoreCase(story.getPublicationState())
                         && story.getArchivedAt() == null;
 
-        if (publicReadable) return true;
+        if (publicReadable) {
+            return true;
+        }
 
         AppUser currentUser = tryGetAuthenticatedUser();
-        if (currentUser == null) return false;
+        if (currentUser == null) {
+            return false;
+        }
 
         return story.getOwnerUserId().equals(currentUser.getId()) || isModeratorOrAdmin(currentUser);
     }
@@ -178,7 +188,16 @@ public class SkillService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / falta de programación defensiva.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
@@ -188,14 +207,21 @@ public class SkillService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        // Mala práctica corregida:
+        // catch vacío.
+        // Tipo: swallowing exceptions / ocultar errores silenciosamente.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private Pageable buildPageable(int page, int size, String sort) {

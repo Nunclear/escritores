@@ -13,12 +13,19 @@ import com.nunclear.escritores.repository.*;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class EventService {
+
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
+    private static final String PUBLICATION_STATE_PUBLISHED = "published";
+    private static final String VISIBILITY_STATE_PUBLIC = "public";
+    private static final String SORT_EVENT_ON = "eventOn";
+    private static final String DEFAULT_EVENT_SORT = SORT_EVENT_ON + ",desc";
 
     private final StoryEventRepository storyEventRepository;
     private final StoryRepository storyRepository;
@@ -59,7 +66,7 @@ public class EventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Evento no encontrado"));
 
         Story story = storyRepository.findById(event.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -76,11 +83,11 @@ public class EventService {
             Integer storyId, String eventKind, Integer importance, int page, int size, String sort
     ) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "eventOn,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_EVENT_SORT : sort);
         Page<StoryEvent> result = storyEventRepository.findByStoryWithFilters(storyId, eventKind, importance, pageable);
 
         return new PageResponse<>(
@@ -103,11 +110,11 @@ public class EventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Capítulo no encontrado"));
 
         Story story = storyRepository.findById(chapter.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateChapterReadAccess(chapter, story);
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "eventOn,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_EVENT_SORT : sort);
         Page<StoryEvent> result = storyEventRepository.findByChapterId(chapterId, pageable);
 
         return new PageResponse<>(
@@ -128,7 +135,7 @@ public class EventService {
     public PageResponse<EventListItemResponse> searchEvents(
             String q, String tag, int page, int size, String sort
     ) {
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "eventOn,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_EVENT_SORT : sort);
         Page<StoryEvent> result = storyEventRepository.searchEvents(q, tag, pageable);
 
         var content = result.getContent().stream()
@@ -180,7 +187,7 @@ public class EventService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -194,7 +201,9 @@ public class EventService {
     }
 
     private void validateChapterBelongsToStory(Integer chapterId, Integer storyId) {
-        if (chapterId == null) return;
+        if (chapterId == null) {
+            return;
+        }
 
         Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new BadRequestException("El capítulo no existe"));
@@ -205,7 +214,9 @@ public class EventService {
     }
 
     private void validateLinkedCharactersBelongToStory(java.util.List<Integer> characterIds, Integer storyId) {
-        if (characterIds == null || characterIds.isEmpty()) return;
+        if (characterIds == null || characterIds.isEmpty()) {
+            return;
+        }
 
         for (Integer characterId : characterIds) {
             StoryCharacter character = storyCharacterRepository.findById(characterId)
@@ -219,16 +230,16 @@ public class EventService {
 
     private void validateReadAccess(Story story) {
         if (!canReadStory(story)) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
     }
 
     private void validateChapterReadAccess(Chapter chapter, Story story) {
         boolean publicReadable =
                 chapter.getArchivedAt() == null
-                        && "published".equalsIgnoreCase(chapter.getPublicationState())
-                        && "public".equalsIgnoreCase(story.getVisibilityState())
-                        && "published".equalsIgnoreCase(story.getPublicationState())
+                        && PUBLICATION_STATE_PUBLISHED.equalsIgnoreCase(chapter.getPublicationState())
+                        && VISIBILITY_STATE_PUBLIC.equalsIgnoreCase(story.getVisibilityState())
+                        && PUBLICATION_STATE_PUBLISHED.equalsIgnoreCase(story.getPublicationState())
                         && story.getArchivedAt() == null;
 
         if (!publicReadable && !canReadStory(story)) {
@@ -238,14 +249,18 @@ public class EventService {
 
     private boolean canReadStory(Story story) {
         boolean publicReadable =
-                "public".equalsIgnoreCase(story.getVisibilityState())
-                        && "published".equalsIgnoreCase(story.getPublicationState())
+                VISIBILITY_STATE_PUBLIC.equalsIgnoreCase(story.getVisibilityState())
+                        && PUBLICATION_STATE_PUBLISHED.equalsIgnoreCase(story.getPublicationState())
                         && story.getArchivedAt() == null;
 
-        if (publicReadable) return true;
+        if (publicReadable) {
+            return true;
+        }
 
         AppUser currentUser = tryGetAuthenticatedUser();
-        if (currentUser == null) return false;
+        if (currentUser == null) {
+            return false;
+        }
 
         return story.getOwnerUserId().equals(currentUser.getId()) || isModeratorOrAdmin(currentUser);
     }
@@ -255,7 +270,13 @@ public class EventService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
@@ -265,14 +286,18 @@ public class EventService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private String toJson(Object value) {
@@ -297,7 +322,8 @@ public class EventService {
             case "createdAt" -> "createdAt";
             case "updatedAt" -> "updatedAt";
             case "title" -> "title";
-            default -> "eventOn";
+            case SORT_EVENT_ON -> SORT_EVENT_ON;
+            default -> SORT_EVENT_ON;
         };
     }
 }

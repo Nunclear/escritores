@@ -17,12 +17,15 @@ import com.nunclear.escritores.repository.StoryRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class CharacterService {
+
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
 
     private final StoryCharacterRepository storyCharacterRepository;
     private final StoryRepository storyRepository;
@@ -60,7 +63,7 @@ public class CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException("Personaje no encontrado"));
 
         Story story = storyRepository.findById(character.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -83,7 +86,7 @@ public class CharacterService {
             String sort
     ) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -182,7 +185,7 @@ public class CharacterService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -199,7 +202,7 @@ public class CharacterService {
         if (canReadStory(story)) {
             return;
         }
-        throw new ResourceNotFoundException("Historia no encontrada");
+        throw new ResourceNotFoundException(STORY_NOT_FOUND);
     }
 
     private boolean canReadStory(Story story) {
@@ -228,7 +231,13 @@ public class CharacterService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
@@ -239,14 +248,18 @@ public class CharacterService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private String toJson(Object value) {

@@ -16,6 +16,7 @@ import com.nunclear.escritores.repository.VolumeRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,12 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class VolumeService {
+
+    // Mala práctica corregida:
+    // strings mágicos repetidos.
+    // Tipo: duplicación de literales / baja mantenibilidad.
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
+    private static final String SORT_POSITION_INDEX = "positionIndex";
 
     private final VolumeRepository volumeRepository;
     private final StoryRepository storyRepository;
@@ -58,7 +65,7 @@ public class VolumeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Volumen no encontrado"));
 
         Story story = storyRepository.findById(volume.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -73,11 +80,16 @@ public class VolumeService {
 
     public PageResponse<VolumeListItemResponse> getVolumesByStory(Integer storyId, int page, int size, String sort) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "positionIndex,asc" : sort);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? SORT_POSITION_INDEX + ",asc" : sort
+        );
+
         Page<Volume> result = volumeRepository.findByStoryId(storyId, pageable);
 
         return new PageResponse<>(
@@ -173,7 +185,7 @@ public class VolumeService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -211,14 +223,14 @@ public class VolumeService {
 
         AppUser currentUser = tryGetAuthenticatedUser();
         if (currentUser == null) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
 
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
         boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
 
         if (!isOwner && !isModeratorOrAdmin) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
     }
 
@@ -227,7 +239,16 @@ public class VolumeService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / falta de validación defensiva.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
@@ -238,14 +259,21 @@ public class VolumeService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        // Mala práctica corregida:
+        // catch vacío.
+        // Tipo: swallowing exceptions / ocultamiento silencioso de errores.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private Pageable buildPageable(int page, int size, String sort) {
@@ -263,8 +291,8 @@ public class VolumeService {
             case "title" -> "title";
             case "createdAt" -> "createdAt";
             case "updatedAt" -> "updatedAt";
-            case "positionIndex" -> "positionIndex";
-            default -> "positionIndex";
+            case SORT_POSITION_INDEX -> SORT_POSITION_INDEX;
+            default -> SORT_POSITION_INDEX;
         };
     }
 }

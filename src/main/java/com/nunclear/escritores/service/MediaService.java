@@ -10,6 +10,7 @@ import com.nunclear.escritores.repository.*;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,13 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class MediaService {
+
+    // Mala práctica corregida:
+    // literales duplicados ("magic strings").
+    // Tipo: duplicación de cadenas / baja mantenibilidad.
+    private static final String FILE_NOT_FOUND = "Archivo no encontrado";
+    private static final String CHAPTER_NOT_FOUND = "Capítulo no encontrado";
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
 
     private final MediaRepository mediaRepository;
     private final ChapterRepository chapterRepository;
@@ -51,13 +59,13 @@ public class MediaService {
 
     public MediaDetailResponse getMediaById(Integer id) {
         Media media = mediaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Archivo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(FILE_NOT_FOUND));
 
         Chapter chapter = chapterRepository.findById(media.getChapterId())
-                .orElseThrow(() -> new ResourceNotFoundException("Capítulo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(CHAPTER_NOT_FOUND));
 
         Story story = storyRepository.findById(chapter.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(chapter, story);
 
@@ -79,10 +87,10 @@ public class MediaService {
             String sort
     ) {
         Chapter chapter = chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new ResourceNotFoundException("Capítulo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(CHAPTER_NOT_FOUND));
 
         Story story = storyRepository.findById(chapter.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(chapter, story);
 
@@ -123,13 +131,13 @@ public class MediaService {
 
     public MediaDownloadResponse downloadMedia(Integer id) {
         Media media = mediaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Archivo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(FILE_NOT_FOUND));
 
         Chapter chapter = chapterRepository.findById(media.getChapterId())
-                .orElseThrow(() -> new ResourceNotFoundException("Capítulo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(CHAPTER_NOT_FOUND));
 
         Story story = storyRepository.findById(chapter.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(chapter, story);
 
@@ -144,7 +152,7 @@ public class MediaService {
 
     private Media getEditableMedia(Integer id) {
         Media media = mediaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Archivo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(FILE_NOT_FOUND));
 
         getEditableChapter(media.getChapterId());
         return media;
@@ -152,10 +160,10 @@ public class MediaService {
 
     private Chapter getEditableChapter(Integer chapterId) {
         Chapter chapter = chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new ResourceNotFoundException("Capítulo no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(CHAPTER_NOT_FOUND));
 
         Story story = storyRepository.findById(chapter.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -182,14 +190,14 @@ public class MediaService {
 
         AppUser currentUser = tryGetAuthenticatedUser();
         if (currentUser == null) {
-            throw new ResourceNotFoundException("Archivo no encontrado");
+            throw new ResourceNotFoundException(FILE_NOT_FOUND);
         }
 
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
         boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
 
         if (!isOwner && !isModeratorOrAdmin) {
-            throw new ResourceNotFoundException("Archivo no encontrado");
+            throw new ResourceNotFoundException(FILE_NOT_FOUND);
         }
     }
 
@@ -198,7 +206,16 @@ public class MediaService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / falta de programación defensiva.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
@@ -208,14 +225,21 @@ public class MediaService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        // Mala práctica corregida:
+        // bloque catch vacío.
+        // Tipo: swallowing exceptions / ocultamiento silencioso de errores.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private Pageable buildPageable(int page, int size, String sort) {

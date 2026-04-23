@@ -13,13 +13,17 @@ import com.nunclear.escritores.security.CustomUserDetails;
 import com.nunclear.escritores.security.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
@@ -27,6 +31,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final String USER_NOT_FOUND = "Usuario no encontrado";
 
     private final AppUserRepository appUserRepository;
     private final UserSessionRepository userSessionRepository;
@@ -67,7 +74,7 @@ public class AuthService {
         token.setExpiresAt(LocalDateTime.now().plusHours(24));
         emailVerificationTokenRepository.save(token);
 
-        System.out.println("TOKEN VERIFICACION DEV: " + rawVerificationToken);
+        log.debug("TOKEN VERIFICACION DEV: {}", rawVerificationToken);
 
         return new RegisterResponse(
                 saved.getId(),
@@ -143,7 +150,7 @@ public class AuthService {
         }
 
         AppUser user = appUserRepository.findById(session.getUserId())
-                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
+                .orElseThrow(() -> new UnauthorizedException(USER_NOT_FOUND));
 
         String newSessionId = UUID.randomUUID().toString();
         String newRefreshToken = UUID.randomUUID().toString() + "." + UUID.randomUUID();
@@ -214,7 +221,7 @@ public class AuthService {
             token.setExpiresAt(LocalDateTime.now().plusMinutes(30));
             passwordResetTokenRepository.save(token);
 
-            System.out.println("TOKEN RESET DEV: " + rawToken);
+            log.debug("TOKEN RESET DEV: {}", rawToken);
         });
 
         return new MessageResponse("Si el correo existe, se enviaron instrucciones");
@@ -230,7 +237,7 @@ public class AuthService {
         }
 
         AppUser user = appUserRepository.findById(token.getUserId())
-                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
+                .orElseThrow(() -> new BadRequestException(USER_NOT_FOUND));
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         appUserRepository.save(user);
@@ -256,7 +263,7 @@ public class AuthService {
         }
 
         AppUser user = appUserRepository.findById(token.getUserId())
-                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
+                .orElseThrow(() -> new BadRequestException(USER_NOT_FOUND));
 
         token.setVerifiedAt(LocalDateTime.now());
         emailVerificationTokenRepository.save(token);
@@ -280,14 +287,20 @@ public class AuthService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
 
         return appUserRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
+                .orElseThrow(() -> new UnauthorizedException(USER_NOT_FOUND));
     }
 
     private String hash(String value) {
@@ -295,8 +308,8 @@ public class AuthService {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashedBytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hashedBytes);
-        } catch (Exception ex) {
-            throw new RuntimeException("Error hashing token", ex);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 no está disponible", ex);
         }
     }
 }

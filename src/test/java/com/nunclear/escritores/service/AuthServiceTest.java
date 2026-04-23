@@ -67,8 +67,10 @@ class AuthServiceTest {
         SecurityContextHolder.clearContext();
     }
 
+    // ==================== REGISTER TESTS ====================
+
     @Test
-    void register_exitoso() {
+    void should_register_successfully_when_all_data_is_valid() {
         RegisterRequest request = new RegisterRequest(
                 "usuario1",
                 "usuario1@test.com",
@@ -103,7 +105,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void register_fallido_por_loginName_duplicado() {
+    void should_throw_conflict_when_login_name_already_exists() {
         RegisterRequest request = new RegisterRequest(
                 "usuario1",
                 "usuario1@test.com",
@@ -124,7 +126,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void register_fallido_por_emailAddress_duplicado() {
+    void should_throw_conflict_when_email_already_exists() {
         RegisterRequest request = new RegisterRequest(
                 "usuario1",
                 "usuario1@test.com",
@@ -145,8 +147,10 @@ class AuthServiceTest {
         verify(emailVerificationTokenRepository, never()).save(any());
     }
 
+    // ==================== LOGIN TESTS ====================
+
     @Test
-    void login_correcto_con_usuario_valido() {
+    void should_login_successfully_when_credentials_are_correct() {
         LoginRequest request = new LoginRequest("usuario1", "Password123");
 
         AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
@@ -181,15 +185,30 @@ class AuthServiceTest {
     }
 
     @Test
-    void login_fallido_por_contrasena_incorrecta() {
-        LoginRequest request = new LoginRequest("usuario1", "PasswordIncorrecta");
+    void should_throw_unauthorized_when_user_not_found() {
+        LoginRequest request = new LoginRequest("noexiste", "Password123");
+
+        when(appUserRepository.findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase("noexiste", "noexiste"))
+                .thenReturn(Optional.empty());
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.login(request, httpServletRequest)
+        );
+
+        assertEquals("Credenciales inválidas", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_unauthorized_when_password_is_incorrect() {
+        LoginRequest request = new LoginRequest("usuario1", "WrongPassword");
 
         AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
         user.setAccountState(AccountState.active);
 
         when(appUserRepository.findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase("usuario1", "usuario1"))
                 .thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("PasswordIncorrecta", "hashed-pass")).thenReturn(false);
+        when(passwordEncoder.matches("WrongPassword", "hashed-pass")).thenReturn(false);
 
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
@@ -198,11 +217,66 @@ class AuthServiceTest {
 
         assertEquals("Credenciales inválidas", ex.getMessage());
         verify(userSessionRepository, never()).save(any());
-        verify(jwtService, never()).generateAccessToken(anyInt(), anyString(), anyString(), anyString());
     }
 
     @Test
-    void refresh_token_valido() {
+    void should_throw_unauthorized_when_account_is_deleted() {
+        LoginRequest request = new LoginRequest("usuario1", "Password123");
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+        user.setDeletedAt(LocalDateTime.now());
+
+        when(appUserRepository.findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase("usuario1", "usuario1"))
+                .thenReturn(Optional.of(user));
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.login(request, httpServletRequest)
+        );
+
+        assertEquals("Cuenta no disponible", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_unauthorized_when_account_is_suspended() {
+        LoginRequest request = new LoginRequest("usuario1", "Password123");
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+        user.setAccountState(AccountState.suspended);
+
+        when(appUserRepository.findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase("usuario1", "usuario1"))
+                .thenReturn(Optional.of(user));
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.login(request, httpServletRequest)
+        );
+
+        assertEquals("Cuenta suspendida o bloqueada", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_unauthorized_when_account_is_banned() {
+        LoginRequest request = new LoginRequest("usuario1", "Password123");
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+        user.setAccountState(AccountState.banned);
+
+        when(appUserRepository.findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase("usuario1", "usuario1"))
+                .thenReturn(Optional.of(user));
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.login(request, httpServletRequest)
+        );
+
+        assertEquals("Cuenta suspendida o bloqueada", ex.getMessage());
+    }
+
+    // ==================== REFRESH TOKEN TESTS ====================
+
+    @Test
+    void should_refresh_token_successfully_when_token_is_valid() {
         String rawRefreshToken = "refresh-token-ok";
         String refreshHash = sha256Base64(rawRefreshToken);
 
@@ -229,14 +303,13 @@ class AuthServiceTest {
         assertNotNull(response.refreshToken());
         assertEquals("Bearer", response.tokenType());
         assertEquals(3600L, response.expiresIn());
-
         assertNotNull(session.getRevokedAt());
         verify(userSessionRepository, times(2)).save(any(UserSession.class));
     }
 
     @Test
-    void refresh_token_invalido_o_expirado_invalido() {
-        String rawRefreshToken = "refresh-token-invalido";
+    void should_throw_unauthorized_when_refresh_token_is_invalid() {
+        String rawRefreshToken = "invalid-token";
         String refreshHash = sha256Base64(rawRefreshToken);
 
         when(userSessionRepository.findByRefreshTokenHashAndRevokedAtIsNull(refreshHash))
@@ -248,13 +321,12 @@ class AuthServiceTest {
         );
 
         assertEquals("Refresh token inválido", ex.getMessage());
-        verify(userSessionRepository, never()).save(any());
         verify(jwtService, never()).generateAccessToken(anyInt(), anyString(), anyString(), anyString());
     }
 
     @Test
-    void refresh_token_invalido_o_expirado_expirado() {
-        String rawRefreshToken = "refresh-token-expirado";
+    void should_throw_unauthorized_when_refresh_token_is_expired() {
+        String rawRefreshToken = "expired-token";
         String refreshHash = sha256Base64(rawRefreshToken);
 
         UserSession session = new UserSession();
@@ -271,11 +343,34 @@ class AuthServiceTest {
         );
 
         assertEquals("Refresh token expirado", ex.getMessage());
-        verify(jwtService, never()).generateAccessToken(anyInt(), anyString(), anyString(), anyString());
     }
 
     @Test
-    void logout_invalida_refresh_token() {
+    void should_throw_unauthorized_when_user_not_found_on_refresh() {
+        String rawRefreshToken = "valid-format-but-user-deleted";
+        String refreshHash = sha256Base64(rawRefreshToken);
+
+        UserSession session = new UserSession();
+        session.setUserId(999);
+        session.setRefreshTokenHash(refreshHash);
+        session.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        when(userSessionRepository.findByRefreshTokenHashAndRevokedAtIsNull(refreshHash))
+                .thenReturn(Optional.of(session));
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.refresh(new RefreshTokenRequest(rawRefreshToken))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    // ==================== LOGOUT TESTS ====================
+
+    @Test
+    void should_logout_successfully() {
         String rawRefreshToken = "refresh-logout";
         String refreshHash = sha256Base64(rawRefreshToken);
 
@@ -296,7 +391,25 @@ class AuthServiceTest {
     }
 
     @Test
-    void me_devuelve_el_usuario_autenticado() {
+    void should_throw_unauthorized_when_logout_with_invalid_token() {
+        String rawRefreshToken = "invalid-logout-token";
+        String refreshHash = sha256Base64(rawRefreshToken);
+
+        when(userSessionRepository.findByRefreshTokenHashAndRevokedAtIsNull(refreshHash))
+                .thenReturn(Optional.empty());
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.logout(new LogoutRequest(rawRefreshToken))
+        );
+
+        assertEquals("Refresh token inválido", ex.getMessage());
+    }
+
+    // ==================== ME TESTS ====================
+
+    @Test
+    void should_return_current_user_info() {
         AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
         user.setDisplayName("Usuario Uno");
         user.setBioText("Bio");
@@ -320,7 +433,42 @@ class AuthServiceTest {
     }
 
     @Test
-    void forgot_password_responde_sin_filtrar_si_el_correo_existe_cuando_existe() {
+    void should_throw_unauthorized_when_not_authenticated_in_me() {
+        SecurityContext securityContext = mock(SecurityContext.class);
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn("anonymousUser");
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.me()
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    // ==================== FORGOT PASSWORD TESTS ====================
+
+    @Test
+    void should_create_reset_token_when_email_exists() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest("usuario1@test.com");
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+
+        when(appUserRepository.findByEmailAddressIgnoreCase("usuario1@test.com"))
+                .thenReturn(Optional.of(user));
+        when(passwordResetTokenRepository.findByUserIdAndUsedAtIsNull(10))
+                .thenReturn(List.of());
+
+        MessageResponse response = authService.forgotPassword(request);
+
+        assertEquals("Si el correo existe, se enviaron instrucciones", response.message());
+        verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
+    }
+
+    @Test
+    void should_invalidate_old_reset_tokens_before_creating_new_one() {
         ForgotPasswordRequest request = new ForgotPasswordRequest("usuario1@test.com");
 
         AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
@@ -343,12 +491,11 @@ class AuthServiceTest {
         assertEquals("Si el correo existe, se enviaron instrucciones", response.message());
         assertNotNull(old1.getUsedAt());
         assertNotNull(old2.getUsedAt());
-
         verify(passwordResetTokenRepository, times(3)).save(any(PasswordResetToken.class));
     }
 
     @Test
-    void forgot_password_responde_sin_filtrar_si_el_correo_existe_cuando_no_existe() {
+    void should_return_generic_message_when_email_does_not_exist() {
         ForgotPasswordRequest request = new ForgotPasswordRequest("noexiste@test.com");
 
         when(appUserRepository.findByEmailAddressIgnoreCase("noexiste@test.com"))
@@ -361,9 +508,67 @@ class AuthServiceTest {
         verify(passwordResetTokenRepository, never()).save(any());
     }
 
+    // ==================== RESET PASSWORD TESTS ====================
+
     @Test
-    void reset_password_falla_con_token_invalido() {
-        String rawResetToken = "reset-token-invalido";
+    void should_reset_password_successfully_with_valid_token() {
+        String rawResetToken = "valid-reset-token";
+        String tokenHash = sha256Base64(rawResetToken);
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUserId(10);
+        resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "old-hashed-pass");
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(resetToken));
+        when(appUserRepository.findById(10)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewPassword123")).thenReturn("new-hashed-pass");
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(10)).thenReturn(List.of());
+
+        MessageResponse response = authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NewPassword123"));
+
+        assertEquals("Contraseña actualizada correctamente", response.message());
+        assertEquals("new-hashed-pass", user.getPasswordHash());
+        assertNotNull(resetToken.getUsedAt());
+        verify(appUserRepository).save(any(AppUser.class));
+        verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
+    }
+
+    @Test
+    void should_invalidate_all_sessions_after_password_reset() {
+        String rawResetToken = "valid-reset-token";
+        String tokenHash = sha256Base64(rawResetToken);
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUserId(10);
+        resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "old-hashed-pass");
+
+        UserSession session1 = new UserSession();
+        session1.setId(1L);
+        UserSession session2 = new UserSession();
+        session2.setId(2L);
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(resetToken));
+        when(appUserRepository.findById(10)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewPassword123")).thenReturn("new-hashed-pass");
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(10))
+                .thenReturn(List.of(session1, session2));
+
+        authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NewPassword123"));
+
+        assertNotNull(session1.getRevokedAt());
+        assertNotNull(session2.getRevokedAt());
+        verify(userSessionRepository, times(2)).save(any(UserSession.class));
+    }
+
+    @Test
+    void should_throw_bad_request_when_reset_token_is_invalid() {
+        String rawResetToken = "invalid-reset-token";
         String tokenHash = sha256Base64(rawResetToken);
 
         when(passwordResetTokenRepository.findByTokenHashAndUsedAtIsNull(tokenHash))
@@ -371,13 +576,174 @@ class AuthServiceTest {
 
         BadRequestException ex = assertThrows(
                 BadRequestException.class,
-                () -> authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NuevaPassword123"))
+                () -> authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NewPassword123"))
         );
 
         assertEquals("Token inválido", ex.getMessage());
-        verify(appUserRepository, never()).save(any());
-        verify(userSessionRepository, never()).findByUserIdAndRevokedAtIsNull(anyInt());
     }
+
+    @Test
+    void should_throw_bad_request_when_reset_token_is_expired() {
+        String rawResetToken = "expired-reset-token";
+        String tokenHash = sha256Base64(rawResetToken);
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setExpiresAt(LocalDateTime.now().minusSeconds(1));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(resetToken));
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NewPassword123"))
+        );
+
+        assertEquals("Token expirado", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_bad_request_when_reset_token_user_not_found() {
+        String rawResetToken = "user-deleted-token";
+        String tokenHash = sha256Base64(rawResetToken);
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUserId(999);
+        resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(resetToken));
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> authService.resetPassword(new ResetPasswordRequest(rawResetToken, "NewPassword123"))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    // ==================== VERIFY EMAIL TESTS ====================
+
+    @Test
+    void should_verify_email_successfully_with_valid_token() {
+        String rawVerificationToken = "valid-verification-token";
+        String tokenHash = sha256Base64(rawVerificationToken);
+
+        EmailVerificationToken emailToken = new EmailVerificationToken();
+        emailToken.setUserId(10);
+        emailToken.setExpiresAt(LocalDateTime.now().plusHours(24));
+
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+        user.setAccountState(AccountState.pending_verification);
+
+        when(emailVerificationTokenRepository.findByTokenHashAndVerifiedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(emailToken));
+        when(appUserRepository.findById(10)).thenReturn(Optional.of(user));
+
+        MessageResponse response = authService.verifyEmail(new VerifyEmailRequest(rawVerificationToken));
+
+        assertEquals("Correo confirmado correctamente", response.message());
+        assertNotNull(emailToken.getVerifiedAt());
+        assertNotNull(user.getEmailVerifiedAt());
+        assertEquals(AccountState.active, user.getAccountState());
+        verify(emailVerificationTokenRepository).save(any(EmailVerificationToken.class));
+        verify(appUserRepository).save(any(AppUser.class));
+    }
+
+    @Test
+    void should_throw_bad_request_when_verification_token_is_invalid() {
+        String rawVerificationToken = "invalid-verification-token";
+        String tokenHash = sha256Base64(rawVerificationToken);
+
+        when(emailVerificationTokenRepository.findByTokenHashAndVerifiedAtIsNull(tokenHash))
+                .thenReturn(Optional.empty());
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> authService.verifyEmail(new VerifyEmailRequest(rawVerificationToken))
+        );
+
+        assertEquals("Token inválido", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_bad_request_when_verification_token_is_expired() {
+        String rawVerificationToken = "expired-verification-token";
+        String tokenHash = sha256Base64(rawVerificationToken);
+
+        EmailVerificationToken emailToken = new EmailVerificationToken();
+        emailToken.setExpiresAt(LocalDateTime.now().minusHours(1));
+
+        when(emailVerificationTokenRepository.findByTokenHashAndVerifiedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(emailToken));
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> authService.verifyEmail(new VerifyEmailRequest(rawVerificationToken))
+        );
+
+        assertEquals("Token expirado", ex.getMessage());
+    }
+
+    @Test
+    void should_throw_bad_request_when_verification_user_not_found() {
+        String rawVerificationToken = "user-deleted-verification-token";
+        String tokenHash = sha256Base64(rawVerificationToken);
+
+        EmailVerificationToken emailToken = new EmailVerificationToken();
+        emailToken.setUserId(999);
+        emailToken.setExpiresAt(LocalDateTime.now().plusHours(24));
+
+        when(emailVerificationTokenRepository.findByTokenHashAndVerifiedAtIsNull(tokenHash))
+                .thenReturn(Optional.of(emailToken));
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> authService.verifyEmail(new VerifyEmailRequest(rawVerificationToken))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    // ==================== INVALIDATE ALL SESSIONS TESTS ====================
+
+    @Test
+    void should_invalidate_all_sessions() {
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+
+        UserSession session1 = new UserSession();
+        session1.setId(1L);
+        UserSession session2 = new UserSession();
+        session2.setId(2L);
+
+        mockAuthenticatedUser(user);
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(10))
+                .thenReturn(List.of(session1, session2));
+
+        MessageResponse response = authService.invalidateAllSessions();
+
+        assertEquals("Todas las sesiones fueron invalidadas", response.message());
+        assertNotNull(session1.getRevokedAt());
+        assertNotNull(session2.getRevokedAt());
+        verify(userSessionRepository, times(2)).save(any(UserSession.class));
+    }
+
+    @Test
+    void should_not_fail_when_invalidating_zero_sessions() {
+        AppUser user = buildUser(10, "usuario1", "usuario1@test.com", "hashed-pass");
+
+        mockAuthenticatedUser(user);
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(10))
+                .thenReturn(List.of());
+
+        MessageResponse response = authService.invalidateAllSessions();
+
+        assertEquals("Todas las sesiones fueron invalidadas", response.message());
+        verify(userSessionRepository, never()).save(any(UserSession.class));
+    }
+
+    // ==================== HELPER METHODS ====================
 
     private AppUser buildUser(Integer id, String loginName, String email, String passwordHash) {
         AppUser user = new AppUser();

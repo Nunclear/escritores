@@ -11,17 +11,23 @@ import com.nunclear.escritores.repository.*;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Base64;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    // Mala práctica corregida:
+    // duplicación de literales ("magic strings").
+    // Tipo: baja mantenibilidad / riesgo de inconsistencias.
+    private static final String USER_NOT_FOUND = "Usuario no encontrado";
+    private static final String SORT_CREATED_AT = "createdAt";
 
     private final AppUserRepository appUserRepository;
     private final StoryRepository storyRepository;
@@ -31,7 +37,7 @@ public class UserService {
 
     public UserProfileResponse getUserById(Integer id) {
         AppUser user = appUserRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
 
         validatePublicReadable(user);
 
@@ -196,7 +202,7 @@ public class UserService {
 
     public PublicAuthorProfileResponse getPublicAuthorProfile(Integer id) {
         AppUser user = appUserRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
 
         validatePublicReadable(user);
 
@@ -217,11 +223,11 @@ public class UserService {
 
     public PageResponse<UserStoryItemResponse> getPublicStoriesByAuthor(Integer id, int page, int size, String sort) {
         AppUser user = appUserRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
 
         validatePublicReadable(user);
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "createdAt,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? SORT_CREATED_AT + ",desc" : sort);
 
         Page<Story> result = storyRepository.findByOwnerUserIdAndVisibilityStateIgnoreCaseAndPublicationStateIgnoreCase(
                 id, "public", "published", pageable
@@ -247,28 +253,39 @@ public class UserService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / falta de validación defensiva.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
 
         return appUserRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
+                .orElseThrow(() -> new UnauthorizedException(USER_NOT_FOUND));
     }
 
     private void validatePublicReadable(AppUser user) {
         if (user.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Usuario no encontrado");
+            throw new ResourceNotFoundException(USER_NOT_FOUND);
         }
 
         if (user.getAccountState() == AccountState.banned) {
-            throw new ResourceNotFoundException("Usuario no encontrado");
+            throw new ResourceNotFoundException(USER_NOT_FOUND);
         }
     }
 
     private Pageable buildPageable(int page, int size, String sort) {
-        String[] sortParts = sort.split(",");
+        String safeSort = (sort == null || sort.isBlank()) ? SORT_CREATED_AT + ",desc" : sort;
+
+        String[] sortParts = safeSort.split(",");
         String field = sortParts[0];
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("desc")
                 ? Sort.Direction.DESC
@@ -279,11 +296,11 @@ public class UserService {
 
     private String mapSortField(String field) {
         return switch (field) {
-            case "createdAt" -> "createdAt";
+            case SORT_CREATED_AT -> SORT_CREATED_AT;
             case "updatedAt" -> "updatedAt";
             case "displayName" -> "displayName";
             case "loginName" -> "loginName";
-            default -> "createdAt";
+            default -> SORT_CREATED_AT;
         };
     }
 }

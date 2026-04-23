@@ -9,6 +9,7 @@ import com.nunclear.escritores.entity.UserSession;
 import com.nunclear.escritores.enums.AccessLevel;
 import com.nunclear.escritores.enums.AccountState;
 import com.nunclear.escritores.exception.BadRequestException;
+import com.nunclear.escritores.exception.ConflictException;
 import com.nunclear.escritores.exception.ResourceNotFoundException;
 import com.nunclear.escritores.exception.UnauthorizedException;
 import com.nunclear.escritores.repository.AppUserRepository;
@@ -425,6 +426,533 @@ class UserServiceTest {
         );
 
         assertEquals("No autenticado", ex.getMessage());
+    }
+
+    // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+    @Test
+    void getUserById_deberiaLanzarNotFound_siUsuarioSuspendido() {
+        AppUser user = mock(AppUser.class);
+
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getAccountState()).thenReturn(AccountState.suspended);
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getUserById(1)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getUserById_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getUserById(999)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getMyProfile_deberiaLanzarUnauthorized_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getMyProfile()
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void listUsers_deberiaRetornarListaVacia() {
+        Page<AppUser> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(appUserRepository.findAllActive(any(Pageable.class))).thenReturn(page);
+
+        PageResponse<UserListItemResponse> response = userService.listUsers(0, 20, "createdAt,desc");
+
+        assertEquals(0, response.content().size());
+        assertEquals(0, response.totalElements());
+    }
+
+    @Test
+    void listUsers_deberiaOrdearCorrectamente() {
+        AppUser user1 = mock(AppUser.class);
+        AppUser user2 = mock(AppUser.class);
+        Page<AppUser> page = new PageImpl<>(List.of(user1, user2), PageRequest.of(0, 20), 2);
+
+        when(appUserRepository.findAllActive(any(Pageable.class))).thenReturn(page);
+
+        when(user1.getId()).thenReturn(1);
+        when(user1.getLoginName()).thenReturn("alice");
+        when(user1.getDisplayName()).thenReturn("Alice");
+        when(user1.getAccessLevel()).thenReturn(AccessLevel.user);
+        when(user1.getAccountState()).thenReturn(AccountState.active);
+
+        when(user2.getId()).thenReturn(2);
+        when(user2.getLoginName()).thenReturn("bob");
+        when(user2.getDisplayName()).thenReturn("Bob");
+        when(user2.getAccessLevel()).thenReturn(AccessLevel.user);
+        when(user2.getAccountState()).thenReturn(AccountState.active);
+
+        PageResponse<UserListItemResponse> response = userService.listUsers(0, 20, "loginName,asc");
+
+        assertEquals(2, response.content().size());
+        assertEquals("alice", response.content().get(0).loginName());
+        assertEquals("bob", response.content().get(1).loginName());
+    }
+
+    @Test
+    void searchUsers_deberiaRetornarListaVacia() {
+        Page<AppUser> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(appUserRepository.searchUsers(eq("noexiste"), any(Pageable.class))).thenReturn(page);
+
+        PageResponse<UserSearchItemResponse> response = userService.searchUsers("noexiste", 0, 20, null);
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void searchUsers_deberiaMultipleResultados() {
+        AppUser user1 = mock(AppUser.class);
+        AppUser user2 = mock(AppUser.class);
+        Page<AppUser> page = new PageImpl<>(List.of(user1, user2), PageRequest.of(0, 20), 2);
+
+        when(appUserRepository.searchUsers(eq("ana"), any(Pageable.class))).thenReturn(page);
+
+        when(user1.getId()).thenReturn(1);
+        when(user1.getLoginName()).thenReturn("ana");
+        when(user1.getDisplayName()).thenReturn("Ana");
+        when(user1.getAvatarUrl()).thenReturn("https://img.test/a.jpg");
+
+        when(user2.getId()).thenReturn(2);
+        when(user2.getLoginName()).thenReturn("anabel");
+        when(user2.getDisplayName()).thenReturn("Anabel");
+        when(user2.getAvatarUrl()).thenReturn("https://img.test/b.jpg");
+
+        PageResponse<UserSearchItemResponse> response = userService.searchUsers("ana", 0, 20, "loginName,asc");
+
+        assertEquals(2, response.content().size());
+        assertEquals("ana", response.content().get(0).loginName());
+    }
+
+    @Test
+    void updateMyProfile_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> userService.updateMyProfile(
+                        new UpdateMyProfileRequest("New Name", "New Bio", "https://url.jpg")
+                )
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void updateMyProfile_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.updateMyProfile(
+                        new UpdateMyProfileRequest("New Name", "New Bio", "https://url.jpg")
+                )
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void updateMyProfile_deberiaGuardarConNulosOpcionales() {
+        AppUser user = mock(AppUser.class);
+        AppUser saved = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+
+        when(appUserRepository.save(user)).thenReturn(saved);
+        when(saved.getId()).thenReturn(1);
+        when(saved.getDisplayName()).thenReturn("Name");
+        when(saved.getBioText()).thenReturn(null);
+        when(saved.getAvatarUrl()).thenReturn(null);
+        when(saved.getUpdatedAt()).thenReturn(LocalDateTime.of(2026, 4, 22, 12, 0));
+
+        UpdateMyProfileResponse response = userService.updateMyProfile(
+                new UpdateMyProfileRequest("Name", null, null)
+        );
+
+        assertEquals(1, response.id());
+        assertEquals("Name", response.displayName());
+        verify(user).setDisplayName("Name");
+    }
+
+    @Test
+    void changeAvatar_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> userService.changeAvatar(new ChangeAvatarRequest("https://url.jpg"))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void changeAvatar_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.changeAvatar(new ChangeAvatarRequest("https://url.jpg"))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void changePassword_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> userService.changePassword(new ChangePasswordRequest("old", "new"))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void changePassword_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.changePassword(new ChangePasswordRequest("old", "new"))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void changePassword_deberiaNoRevocarSesionesSiNoHay() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(1);
+        when(user.getPasswordHash()).thenReturn("oldHash");
+
+        when(passwordEncoder.matches("oldPass", "oldHash")).thenReturn(true);
+        when(passwordEncoder.encode("newPass123")).thenReturn("newHash");
+
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(1)).thenReturn(List.of());
+
+        MessageResponse response = userService.changePassword(
+                new ChangePasswordRequest("oldPass", "newPass123")
+        );
+
+        assertEquals("Contraseña actualizada correctamente", response.message());
+        verify(appUserRepository).save(user);
+        verify(userSessionRepository, never()).save(any(UserSession.class));
+    }
+
+    @Test
+    void changeEmail_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> userService.changeEmail(new ChangeEmailRequest("new@test.com", "pass"))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void changeEmail_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.changeEmail(new ChangeEmailRequest("new@test.com", "pass"))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void changeEmail_deberiaLanzarConflict_siEmailYaUsado() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+        when(user.getPasswordHash()).thenReturn("hash");
+        when(passwordEncoder.matches("pass", "hash")).thenReturn(true);
+
+        when(appUserRepository.existsByEmailAddressIgnoreCase("used@test.com")).thenReturn(true);
+
+        ConflictException ex = assertThrows(
+                ConflictException.class,
+                () -> userService.changeEmail(new ChangeEmailRequest("used@test.com", "pass"))
+        );
+
+        assertEquals("El correo ya está en uso", ex.getMessage());
+    }
+
+    @Test
+    void changeEmail_deberiaLanzarConflict_siPendingEmailYaUsado() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+        when(user.getPasswordHash()).thenReturn("hash");
+        when(passwordEncoder.matches("pass", "hash")).thenReturn(true);
+
+        when(appUserRepository.existsByEmailAddressIgnoreCase("pending@test.com")).thenReturn(false);
+        when(appUserRepository.existsByPendingEmailAddressIgnoreCase("pending@test.com")).thenReturn(true);
+
+        ConflictException ex = assertThrows(
+                ConflictException.class,
+                () -> userService.changeEmail(new ChangeEmailRequest("pending@test.com", "pass"))
+        );
+
+        assertEquals("El correo ya está en uso", ex.getMessage());
+    }
+
+    @Test
+    void deactivateMyAccount_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> userService.deactivateMyAccount()
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void deactivateMyAccount_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.deactivateMyAccount()
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void deactivateMyAccount_deberiaSinSesiones() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1);
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(1)).thenReturn(List.of());
+
+        MessageResponse response = userService.deactivateMyAccount();
+
+        assertEquals("Cuenta desactivada correctamente", response.message());
+        verify(user).setAccountState(AccountState.banned);
+        verify(user).setDeletedAt(any(LocalDateTime.class));
+        verify(appUserRepository).save(user);
+        verify(userSessionRepository, never()).save(any(UserSession.class));
+    }
+
+    @Test
+    void getPublicAuthorProfile_deberiaLanzarNotFound_siUsuarioEliminado() {
+        AppUser user = mock(AppUser.class);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(LocalDateTime.now());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicAuthorProfile(2)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicAuthorProfile_deberiaLanzarNotFound_siUsuarioBaneado() {
+        AppUser user = mock(AppUser.class);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getAccountState()).thenReturn(AccountState.banned);
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicAuthorProfile(2)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicAuthorProfile_deberiaLanzarNotFound_siNoEncontrado() {
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicAuthorProfile(999)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicStoriesByAuthor_deberiaLanzarNotFound_siAutorNoEncontrado() {
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicStoriesByAuthor(999, 0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicStoriesByAuthor_deberiaLanzarNotFound_siAutorEliminado() {
+        AppUser user = mock(AppUser.class);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(LocalDateTime.now());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicStoriesByAuthor(2, 0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicStoriesByAuthor_deberiaLanzarNotFound_siAutorBaneado() {
+        AppUser user = mock(AppUser.class);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getAccountState()).thenReturn(AccountState.banned);
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> userService.getPublicStoriesByAuthor(2, 0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getPublicStoriesByAuthor_deberiaRetornarPaginaVacia() {
+        AppUser user = mock(AppUser.class);
+        Page<Story> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getAccountState()).thenReturn(AccountState.active);
+
+        when(storyRepository.findByOwnerUserIdAndVisibilityStateIgnoreCaseAndPublicationStateIgnoreCase(
+                eq(2), eq("public"), eq("published"), any(Pageable.class)
+        )).thenReturn(page);
+
+        PageResponse<UserStoryItemResponse> response = userService.getPublicStoriesByAuthor(2, 0, 20, null);
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void getPublicStoriesByAuthor_deberiaRetornarMultipleStories() {
+        AppUser user = mock(AppUser.class);
+        Story story1 = mock(Story.class);
+        Story story2 = mock(Story.class);
+        Page<Story> page = new PageImpl<>(List.of(story1, story2), PageRequest.of(0, 20), 2);
+
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+        when(user.getAccountState()).thenReturn(AccountState.active);
+
+        when(storyRepository.findByOwnerUserIdAndVisibilityStateIgnoreCaseAndPublicationStateIgnoreCase(
+                eq(2), eq("public"), eq("published"), any(Pageable.class)
+        )).thenReturn(page);
+
+        when(story1.getId()).thenReturn(10);
+        when(story1.getTitle()).thenReturn("Historia 1");
+        when(story1.getSlugText()).thenReturn("historia-1");
+        when(story1.getPublicationState()).thenReturn("published");
+        when(story1.getVisibilityState()).thenReturn("public");
+
+        when(story2.getId()).thenReturn(11);
+        when(story2.getTitle()).thenReturn("Historia 2");
+        when(story2.getSlugText()).thenReturn("historia-2");
+        when(story2.getPublicationState()).thenReturn("published");
+        when(story2.getVisibilityState()).thenReturn("public");
+
+        PageResponse<UserStoryItemResponse> response = userService.getPublicStoriesByAuthor(2, 0, 20, "createdAt,desc");
+
+        assertEquals(2, response.content().size());
+        assertEquals("Historia 1", response.content().get(0).title());
+        assertEquals("Historia 2", response.content().get(1).title());
     }
 
     private void mockAuthenticated(CustomUserDetails principal) {

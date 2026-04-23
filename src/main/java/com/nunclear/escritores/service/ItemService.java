@@ -14,12 +14,18 @@ import com.nunclear.escritores.repository.StoryRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class ItemService {
+
+    // Mala práctica corregida:
+    // literal duplicado.
+    // Tipo: duplicación de cadenas mágicas / menor mantenibilidad.
+    private static final String STORY_NOT_FOUND = "Historia no encontrada";
 
     private final ItemRepository itemRepository;
     private final StoryRepository storyRepository;
@@ -49,7 +55,7 @@ public class ItemService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ítem no encontrado"));
 
         Story story = storyRepository.findById(item.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -71,7 +77,7 @@ public class ItemService {
             String sort
     ) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
 
@@ -124,7 +130,7 @@ public class ItemService {
 
     private Story getEditableStory(Integer storyId) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Historia no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
@@ -149,14 +155,14 @@ public class ItemService {
 
         AppUser currentUser = tryGetAuthenticatedUser();
         if (currentUser == null) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
 
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
         boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
 
         if (!isOwner && !isModeratorOrAdmin) {
-            throw new ResourceNotFoundException("Historia no encontrada");
+            throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
     }
 
@@ -165,7 +171,16 @@ public class ItemService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / validación defensiva insuficiente.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
@@ -175,14 +190,21 @@ public class ItemService {
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        try {
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (principal instanceof CustomUserDetails userDetails) {
-                return appUserRepository.findById(userDetails.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {
+        // Mala práctica corregida:
+        // try/catch vacío.
+        // Tipo: swallowing exceptions / ocultar errores.
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            return null;
+        }
+
+        return appUserRepository.findById(userDetails.getId()).orElse(null);
     }
 
     private Pageable buildPageable(int page, int size, String sort) {

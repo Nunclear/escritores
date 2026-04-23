@@ -772,6 +772,561 @@ class StoryServiceTest {
         assertEquals("No autenticado", ex.getMessage());
     }
 
+    // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+    @Test
+    void createStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.createStory(new CreateStoryRequest(
+                        "Título",
+                        "Desc",
+                        null,
+                        "public",
+                        "draft",
+                        true,
+                        true,
+                        null
+                ))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void createStory_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.createStory(new CreateStoryRequest(
+                        "Título",
+                        "Desc",
+                        null,
+                        "public",
+                        "draft",
+                        true,
+                        true,
+                        null
+                ))
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getStoryById_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getStoryById(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void getStoryById_deberiaLanzarNotFound_siHistoriaArchivada() {
+        Story story = mock(Story.class);
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(story));
+        when(story.getArchivedAt()).thenReturn(LocalDateTime.now());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getStoryById(10)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void getStoryBySlug_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        when(storyRepository.findBySlugText("no-existe")).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getStoryBySlug("no-existe")
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void getStoryBySlug_deberiaLanzarNotFound_siHistoriaPrivada() {
+        Story story = mock(Story.class);
+
+        when(storyRepository.findBySlugText("privada")).thenReturn(Optional.of(story));
+        when(story.getVisibilityState()).thenReturn("private");
+        when(story.getArchivedAt()).thenReturn(null);
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getStoryBySlug("privada")
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void listPublicStories_deberiaRetornarListaVacia() {
+        Page<Story> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(storyRepository.findByVisibilityStateIgnoreCaseAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
+                eq("public"), eq("published"), any(Pageable.class))
+        ).thenReturn(page);
+
+        PageResponse<StoryListItemResponse> response = storyService.listPublicStories(0, 20, null);
+
+        assertEquals(0, response.content().size());
+        assertEquals(0, response.totalElements());
+    }
+
+    @Test
+    void listPublicStories_deberiaRetornarMultiplesStories() {
+        Story story1 = mock(Story.class);
+        Story story2 = mock(Story.class);
+        Page<Story> page = new PageImpl<>(List.of(story1, story2), PageRequest.of(0, 20), 2);
+
+        when(storyRepository.findByVisibilityStateIgnoreCaseAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
+                eq("public"), eq("published"), any(Pageable.class))
+        ).thenReturn(page);
+
+        when(story1.getId()).thenReturn(1);
+        when(story1.getTitle()).thenReturn("Historia 1");
+        when(story1.getSlugText()).thenReturn("historia-1");
+        when(story1.getVisibilityState()).thenReturn("public");
+        when(story1.getPublicationState()).thenReturn("published");
+
+        when(story2.getId()).thenReturn(2);
+        when(story2.getTitle()).thenReturn("Historia 2");
+        when(story2.getSlugText()).thenReturn("historia-2");
+        when(story2.getVisibilityState()).thenReturn("public");
+        when(story2.getPublicationState()).thenReturn("published");
+
+        PageResponse<StoryListItemResponse> response = storyService.listPublicStories(0, 20, "createdAt,desc");
+
+        assertEquals(2, response.content().size());
+        assertEquals("Historia 1", response.content().get(0).title());
+        assertEquals("Historia 2", response.content().get(1).title());
+    }
+
+    @Test
+    void searchStories_deberiaLanzarBadRequest_siBuscaDraft() {
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> storyService.searchStories("aventura", "public", "draft", 0, 20, null)
+        );
+
+        assertEquals("Solo se permite búsqueda pública de historias publicadas", ex.getMessage());
+    }
+
+    @Test
+    void searchStories_deberiaLanzarBadRequest_siBuscaPrivate() {
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> storyService.searchStories("aventura", "private", "published", 0, 20, null)
+        );
+
+        assertEquals("Solo se permite búsqueda pública de historias publicadas", ex.getMessage());
+    }
+
+    @Test
+    void searchStories_deberiaRetornarVacio() {
+        Page<Story> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(storyRepository.searchPublicStories(eq("inexistente"), eq("public"), eq("published"), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<StoryListItemResponse> response =
+                storyService.searchStories("inexistente", "public", "published", 0, 20, null);
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void getStoriesByUser_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getStoriesByUser(999, true, 0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getMyDrafts_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.getMyDrafts(0, 20, null)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void getMyDrafts_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getMyDrafts(0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getMyDrafts_deberiaRetornarVacio() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        Page<Story> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(principal.getId()).thenReturn(5);
+        mockAuthenticatedUser(principal);
+
+        when(appUserRepository.findById(5)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(5);
+
+        when(storyRepository.findByOwnerUserIdAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
+                eq(5), eq("draft"), any(Pageable.class))
+        ).thenReturn(page);
+
+        PageResponse<UserStorySummaryResponse> response = storyService.getMyDrafts(0, 20, null);
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void getMyArchived_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.getMyArchived(0, 20, null)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void getMyArchived_deberiaLanzarNotFound_siUsuarioNoEncontrado() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(999);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.getMyArchived(0, 20, null)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getMyArchived_deberiaRetornarVacio() {
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        Page<Story> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(principal.getId()).thenReturn(5);
+        mockAuthenticatedUser(principal);
+
+        when(appUserRepository.findById(5)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(5);
+
+        when(storyRepository.findByOwnerUserIdAndArchivedAtIsNotNull(eq(5), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<ArchivedStoryItemResponse> response = storyService.getMyArchived(0, 20, null);
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void updateStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.updateStory(10, new UpdateStoryRequest(
+                        "Nuevo",
+                        "Desc",
+                        null,
+                        "public",
+                        true,
+                        true
+                ))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void updateStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.updateStory(999, new UpdateStoryRequest(
+                        "Nuevo",
+                        "Desc",
+                        null,
+                        "public",
+                        true,
+                        true
+                ))
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void publishStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.publishStory(10)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void publishStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.publishStory(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void unpublishStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.unpublishStory(10)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void unpublishStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.unpublishStory(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void archiveStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.archiveStory(10)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void archiveStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.archiveStory(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void restoreStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.restoreStory(10)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void restoreStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.restoreStory(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void duplicateStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.duplicateStory(10, new DuplicateStoryRequest("Copia"))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void duplicateStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(2);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(2)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.duplicateStory(999, new DuplicateStoryRequest("Copia"))
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void deleteStory_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.deleteStory(10)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void deleteStory_deberiaLanzarNotFound_siHistoriaNoEncontrada() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(1)).thenReturn(Optional.of(mock(AppUser.class)));
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> storyService.deleteStory(999)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void deleteStory_deberiaLanzarUnauthorized_siNoEsOwnerNiAdmin() {
+        Story story = mock(Story.class);
+        AppUser user = mock(AppUser.class);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(99);
+        mockAuthenticatedUser(principal);
+        when(appUserRepository.findById(99)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(99);
+        when(user.getAccessLevel()).thenReturn(AccessLevel.user);
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(story));
+        when(story.getOwnerUserId()).thenReturn(1);
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> storyService.deleteStory(10)
+        );
+
+        assertEquals("No tienes permisos para eliminar esta historia", ex.getMessage());
+    }
+
     private void mockAuthenticatedUser(CustomUserDetails principal) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())

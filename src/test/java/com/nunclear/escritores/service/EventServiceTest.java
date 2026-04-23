@@ -324,6 +324,231 @@ class EventServiceTest {
         assertEquals("No autenticado", ex.getMessage());
     }
 
+    // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+    @Test
+    void getEventsByChapter_deberiaRetornarVacio_siCapituloNoTieneEventos() {
+        Chapter chapter = mock(Chapter.class);
+        Story story = mock(Story.class);
+
+        when(chapterRepository.findById(3)).thenReturn(Optional.of(chapter));
+        when(chapter.getStoryId()).thenReturn(10);
+        when(chapter.getArchivedAt()).thenReturn(null);
+        when(chapter.getPublicationState()).thenReturn("published");
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(story));
+        when(story.getVisibilityState()).thenReturn("public");
+        when(story.getPublicationState()).thenReturn("published");
+        when(story.getArchivedAt()).thenReturn(null);
+
+        Page<StoryEvent> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+        when(storyEventRepository.findByChapterId(eq(3), any(Pageable.class))).thenReturn(page);
+
+        PageResponse<EventListItemResponse> response = eventService.getEventsByChapter(3, 0, 20, "createdAt,asc");
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void getEventsByStory_deberiaRetornarVacio_siHistoriaNoTieneEventos() {
+        Story story = mock(Story.class);
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(story));
+        when(story.getVisibilityState()).thenReturn("public");
+        when(story.getPublicationState()).thenReturn("published");
+        when(story.getArchivedAt()).thenReturn(null);
+
+        Page<StoryEvent> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+        when(storyEventRepository.findByStoryWithFilters(eq(10), any(), any(), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<EventListItemResponse> response =
+                eventService.getEventsByStory(10, null, null, 0, 20, "eventOn,desc");
+
+        assertEquals(0, response.content().size());
+    }
+
+    @Test
+    void searchEvents_deberiaFiltrarEventosPrivados() {
+        StoryEvent event1 = mock(StoryEvent.class);
+        StoryEvent event2 = mock(StoryEvent.class);
+        Story publicStory = mock(Story.class);
+        Story privateBanned = mock(Story.class);
+
+        Page<StoryEvent> page = new PageImpl<>(List.of(event1, event2), PageRequest.of(0, 20), 2);
+        when(storyEventRepository.searchEvents(eq("test"), any(), any(Pageable.class))).thenReturn(page);
+
+        when(event1.getId()).thenReturn(1);
+        when(event1.getTitle()).thenReturn("Público");
+        when(event1.getChapterId()).thenReturn(5);
+        when(event1.getStoryId()).thenReturn(10);
+
+        when(event2.getId()).thenReturn(2);
+        when(event2.getTitle()).thenReturn("Privado");
+        when(event2.getChapterId()).thenReturn(6);
+        when(event2.getStoryId()).thenReturn(20);
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(publicStory));
+        when(publicStory.getVisibilityState()).thenReturn("public");
+        when(publicStory.getPublicationState()).thenReturn("published");
+        when(publicStory.getArchivedAt()).thenReturn(null);
+
+        when(storyRepository.findById(20)).thenReturn(Optional.of(privateBanned));
+        when(privateBanned.getVisibilityState()).thenReturn("private");
+
+        PageResponse<EventListItemResponse> response = eventService.searchEvents("test", null, 0, 20, null);
+
+        assertEquals(1, response.content().size());
+        assertEquals("Público", response.content().get(0).title());
+    }
+
+    @Test
+    void searchEvents_deberiaFiltrarEventosDeHistoriasEliminadas() {
+        StoryEvent event1 = mock(StoryEvent.class);
+        StoryEvent event2 = mock(StoryEvent.class);
+        Story validStory = mock(Story.class);
+
+        Page<StoryEvent> page = new PageImpl<>(List.of(event1, event2), PageRequest.of(0, 20), 2);
+        when(storyEventRepository.searchEvents(eq("event"), any(), any(Pageable.class))).thenReturn(page);
+
+        when(event1.getId()).thenReturn(1);
+        when(event1.getTitle()).thenReturn("Valid");
+        when(event1.getChapterId()).thenReturn(5);
+        when(event1.getStoryId()).thenReturn(10);
+
+        when(event2.getId()).thenReturn(2);
+        when(event2.getTitle()).thenReturn("Deleted");
+        when(event2.getChapterId()).thenReturn(6);
+        when(event2.getStoryId()).thenReturn(999);
+
+        when(storyRepository.findById(10)).thenReturn(Optional.of(validStory));
+        when(validStory.getVisibilityState()).thenReturn("public");
+        when(validStory.getPublicationState()).thenReturn("published");
+        when(validStory.getArchivedAt()).thenReturn(null);
+
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        PageResponse<EventListItemResponse> response = eventService.searchEvents("event", null, 0, 20, null);
+
+        assertEquals(1, response.content().size());
+        assertEquals("Valid", response.content().get(0).title());
+    }
+
+    @Test
+    void getEventById_deberiaLanzarResourceNotFound_siEventoNoExiste() {
+        when(storyEventRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.getEventById(999)
+        );
+
+        assertEquals("Evento no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getEventById_deberiaLanzarResourceNotFound_siHistoriaNoExiste() {
+        StoryEvent event = mock(StoryEvent.class);
+
+        when(storyEventRepository.findById(5)).thenReturn(Optional.of(event));
+        when(event.getStoryId()).thenReturn(999);
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.getEventById(5)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void getEventsByStory_deberiaLanzarResourceNotFound_siHistoriaNoExiste() {
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.getEventsByStory(999, null, null, 0, 20, null)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void getEventsByChapter_deberiaLanzarResourceNotFound_siCapituloNoExiste() {
+        when(chapterRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.getEventsByChapter(999, 0, 20, null)
+        );
+
+        assertEquals("Capítulo no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getEventsByChapter_deberiaLanzarResourceNotFound_siHistoriaNoExiste() {
+        Chapter chapter = mock(Chapter.class);
+
+        when(chapterRepository.findById(3)).thenReturn(Optional.of(chapter));
+        when(chapter.getStoryId()).thenReturn(999);
+        when(storyRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.getEventsByChapter(3, 0, 20, null)
+        );
+
+        assertEquals("Historia no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void updateEvent_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> eventService.updateEvent(5, new UpdateEventRequest(
+                        "Título", "Desc", null, null, null, null, null
+                ))
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void deleteEvent_deberiaLanzarUnauthorized_siNoAutenticado() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> eventService.deleteEvent(5)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
+    }
+
+    @Test
+    void deleteEvent_deberiaLanzarResourceNotFound_siEventoNoExiste() {
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+
+        when(principal.getId()).thenReturn(1);
+        mockAuthenticated(principal);
+
+        when(storyEventRepository.findById(999)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> eventService.deleteEvent(999)
+        );
+
+        assertEquals("Evento no encontrado", ex.getMessage());
+    }
+
     private void mockAuthenticated(CustomUserDetails principal) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())
