@@ -2,15 +2,9 @@ package com.nunclear.escritores.service;
 
 import com.nunclear.escritores.dto.request.UpdateUserAccessLevelRequest;
 import com.nunclear.escritores.dto.request.UpdateUserAccountStateRequest;
-import com.nunclear.escritores.dto.response.AdminUserAccessLevelResponse;
-import com.nunclear.escritores.dto.response.AdminUserAccountStateResponse;
-import com.nunclear.escritores.dto.response.AdminUserByRoleItemResponse;
-import com.nunclear.escritores.dto.response.AdminUserByStateItemResponse;
-import com.nunclear.escritores.dto.response.PageResponse;
-import com.nunclear.escritores.dto.response.UserHistoryResponse;
+import com.nunclear.escritores.dto.response.*;
 import com.nunclear.escritores.entity.AppUser;
 import com.nunclear.escritores.entity.UserChangeHistory;
-import com.nunclear.escritores.entity.UserSession;
 import com.nunclear.escritores.enums.AccessLevel;
 import com.nunclear.escritores.enums.AccountState;
 import com.nunclear.escritores.exception.BadRequestException;
@@ -20,21 +14,12 @@ import com.nunclear.escritores.repository.AppUserRepository;
 import com.nunclear.escritores.repository.UserChangeHistoryRepository;
 import com.nunclear.escritores.repository.UserSessionRepository;
 import com.nunclear.escritores.security.CustomUserDetails;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
+import org.springframework.data.domain.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
@@ -42,12 +27,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AdminUserService - Mockito")
 class AdminUserServiceTest {
 
     @Mock
@@ -67,305 +50,398 @@ class AdminUserServiceTest {
         SecurityContextHolder.clearContext();
     }
 
-    @Nested
-    @DisplayName("Rojo - prueba falla correctamente")
-    class Rojo {
+    @Test
+    void updateAccessLevel_deberiaActualizarYGuardarHistorial() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
 
-        @Test
-        @DisplayName("updateAccessLevel falla si el rol ya es el mismo")
-        void updateAccessLevel_fail_sameValue() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
+        AppUser savedUser = mock(AppUser.class);
 
-            setAuthenticatedUser(adminUser);
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
 
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
+        when(targetUser.getDeletedAt()).thenReturn(null);
+        when(targetUser.getAccessLevel()).thenReturn(AccessLevel.user);
 
-            BadRequestException ex = assertThrows(BadRequestException.class, () ->
-                    adminUserService.updateAccessLevel(10, new UpdateUserAccessLevelRequest("user")));
+        when(adminUser.getId()).thenReturn(adminId);
 
-            assertEquals("El usuario ya tiene ese accessLevel", ex.getMessage());
-            verify(userChangeHistoryRepository, never()).save(any(UserChangeHistory.class));
-        }
+        when(savedUser.getId()).thenReturn(targetUserId);
+        when(savedUser.getAccessLevel()).thenReturn(AccessLevel.admin);
+        when(savedUser.getUpdatedAt()).thenReturn(LocalDateTime.of(2026, 4, 22, 10, 0));
 
-        @Test
-        @DisplayName("updateAccessLevel falla con accessLevel inválido")
-        void updateAccessLevel_fail_invalidAccessLevel() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
+        when(appUserRepository.save(targetUser)).thenReturn(savedUser);
 
-            setAuthenticatedUser(adminUser);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
 
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
 
-            BadRequestException ex = assertThrows(BadRequestException.class, () ->
-                    adminUserService.updateAccessLevel(10, new UpdateUserAccessLevelRequest("superadmin")));
+        UpdateUserAccessLevelRequest request = new UpdateUserAccessLevelRequest("admin");
 
-            assertEquals("accessLevel inválido", ex.getMessage());
-            verify(appUserRepository, never()).save(any(AppUser.class));
-        }
+        AdminUserAccessLevelResponse response = adminUserService.updateAccessLevel(targetUserId, request);
 
-        @Test
-        @DisplayName("updateAccountState falla con accountState inválido")
-        void updateAccountState_fail_invalidState() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
+        assertNotNull(response);
+        assertEquals(targetUserId, response.id());
+        assertEquals("admin", response.accessLevel());
+        assertEquals(LocalDateTime.of(2026, 4, 22, 10, 0), response.updatedAt());
 
-            setAuthenticatedUser(adminUser);
+        verify(targetUser).setAccessLevel(AccessLevel.admin);
+        verify(appUserRepository).save(targetUser);
 
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
+        ArgumentCaptor<UserChangeHistory> historyCaptor = ArgumentCaptor.forClass(UserChangeHistory.class);
+        verify(userChangeHistoryRepository).save(historyCaptor.capture());
 
-            BadRequestException ex = assertThrows(BadRequestException.class, () ->
-                    adminUserService.updateAccountState(10, new UpdateUserAccountStateRequest("frozen")));
-
-            assertEquals("accountState inválido", ex.getMessage());
-            verify(appUserRepository, never()).save(any(AppUser.class));
-        }
-
-        @Test
-        @DisplayName("operaciones fallan si el usuario objetivo no existe")
-        void targetUser_notFound() {
-            when(appUserRepository.findById(999)).thenReturn(Optional.empty());
-
-            ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () ->
-                    adminUserService.getUserHistory(999));
-
-            assertEquals("Usuario no encontrado", ex.getMessage());
-        }
-
-        @Test
-        @DisplayName("operaciones fallan si no hay usuario autenticado válido")
-        void authenticatedUser_invalidPrincipal() {
-            Authentication authentication = mock(Authentication.class);
-            SecurityContext securityContext = mock(SecurityContext.class);
-            when(authentication.getPrincipal()).thenReturn("anonymousUser");
-            when(securityContext.getAuthentication()).thenReturn(authentication);
-            SecurityContextHolder.setContext(securityContext);
-
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-
-            UnauthorizedException ex = assertThrows(UnauthorizedException.class, () ->
-                    adminUserService.updateAccessLevel(10, new UpdateUserAccessLevelRequest("moderator")));
-
-            assertEquals("No autenticado", ex.getMessage());
-        }
+        UserChangeHistory history = historyCaptor.getValue();
+        assertEquals(targetUserId, history.getUserId());
+        assertEquals("accessLevel", history.getChangedField());
+        assertEquals("user", history.getOldValue());
+        assertEquals("admin", history.getNewValue());
+        assertEquals(adminId, history.getChangedByUserId());
+        assertNotNull(history.getChangedAt());
     }
 
-    @Nested
-    @DisplayName("Verde - prueba pasa con la implementación mínima")
-    class Verde {
+    @Test
+    void updateAccessLevel_deberiaLanzarBadRequest_siYaTieneEseRol() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
 
-        @Test
-        @DisplayName("updateAccessLevel cambia el rol y guarda historial")
-        void updateAccessLevel_success() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            targetUser.setUpdatedAt(LocalDateTime.now());
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
 
-            setAuthenticatedUser(adminUser);
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
 
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
-            when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            when(userChangeHistoryRepository.save(any(UserChangeHistory.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
+        when(targetUser.getDeletedAt()).thenReturn(null);
+        when(targetUser.getAccessLevel()).thenReturn(AccessLevel.admin);
 
-            AdminUserAccessLevelResponse response = adminUserService.updateAccessLevel(
-                    10,
-                    new UpdateUserAccessLevelRequest("moderator")
-            );
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
 
-            assertNotNull(response);
-            assertEquals(10, response.id());
-            assertEquals("moderator", response.accessLevel());
-            assertEquals(AccessLevel.moderator, targetUser.getAccessLevel());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
 
-            ArgumentCaptor<UserChangeHistory> captor = ArgumentCaptor.forClass(UserChangeHistory.class);
-            verify(userChangeHistoryRepository).save(captor.capture());
-            UserChangeHistory history = captor.getValue();
+        UpdateUserAccessLevelRequest request = new UpdateUserAccessLevelRequest("admin");
 
-            assertEquals(10, history.getUserId());
-            assertEquals("accessLevel", history.getChangedField());
-            assertEquals("user", history.getOldValue());
-            assertEquals("moderator", history.getNewValue());
-            assertEquals(1, history.getChangedByUserId());
-        }
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> adminUserService.updateAccessLevel(targetUserId, request)
+        );
 
-        @Test
-        @DisplayName("updateAccountState cambia el estado y guarda historial")
-        void updateAccountState_success() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            targetUser.setUpdatedAt(LocalDateTime.now());
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
-
-            setAuthenticatedUser(adminUser);
-
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
-            when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            when(userChangeHistoryRepository.save(any(UserChangeHistory.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-
-            AdminUserAccountStateResponse response = adminUserService.updateAccountState(
-                    10,
-                    new UpdateUserAccountStateRequest("suspended")
-            );
-
-            assertNotNull(response);
-            assertEquals(10, response.id());
-            assertEquals("suspended", response.accountState());
-            assertEquals(AccountState.suspended, targetUser.getAccountState());
-
-            ArgumentCaptor<UserChangeHistory> captor = ArgumentCaptor.forClass(UserChangeHistory.class);
-            verify(userChangeHistoryRepository).save(captor.capture());
-            UserChangeHistory history = captor.getValue();
-
-            assertEquals("accountState", history.getChangedField());
-            assertEquals("active", history.getOldValue());
-            assertEquals("suspended", history.getNewValue());
-            assertEquals(1, history.getChangedByUserId());
-        }
-
-        @Test
-        @DisplayName("updateAccountState banea al usuario y revoca sesiones activas")
-        void updateAccountState_banned_revokesSessions() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-            targetUser.setUpdatedAt(LocalDateTime.now());
-            AppUser adminUser = buildUser(1, "admin", AccessLevel.admin, AccountState.active);
-
-            UserSession session1 = new UserSession();
-            session1.setId(100L);
-            session1.setUserId(10);
-            UserSession session2 = new UserSession();
-            session2.setId(101L);
-            session2.setUserId(10);
-
-            setAuthenticatedUser(adminUser);
-
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(appUserRepository.findById(1)).thenReturn(Optional.of(adminUser));
-            when(userSessionRepository.findByUserIdAndRevokedAtIsNull(10)).thenReturn(List.of(session1, session2));
-            when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            when(userChangeHistoryRepository.save(any(UserChangeHistory.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-            when(userSessionRepository.save(any(UserSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-            AdminUserAccountStateResponse response = adminUserService.updateAccountState(
-                    10,
-                    new UpdateUserAccountStateRequest("banned")
-            );
-
-            assertEquals("banned", response.accountState());
-            assertNotNull(session1.getRevokedAt());
-            assertNotNull(session2.getRevokedAt());
-            verify(userSessionRepository, times(2)).save(any(UserSession.class));
-        }
+        assertEquals("El usuario ya tiene ese accessLevel", ex.getMessage());
+        verify(appUserRepository, never()).save(any());
+        verify(userChangeHistoryRepository, never()).save(any());
     }
 
-    @Nested
-    @DisplayName("Refactorización - mejora del código manteniendo las pruebas en verde")
-    class Refactorizacion {
+    @Test
+    void updateAccessLevel_deberiaLanzarBadRequest_siAccessLevelEsInvalido() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
 
-        @Test
-        @DisplayName("listUsersByRole devuelve usuarios paginados")
-        void listUsersByRole_success() {
-            AppUser user1 = buildUser(10, "user1", AccessLevel.user, AccountState.active);
-            AppUser user2 = buildUser(11, "user2", AccessLevel.user, AccountState.suspended);
-            Page<AppUser> page = new PageImpl<>(List.of(user1, user2), PageRequest.of(0, 20), 2);
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
 
-            when(appUserRepository.findByAccessLevelAndDeletedAtIsNull(eq(AccessLevel.user), any(Pageable.class)))
-                    .thenReturn(page);
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+        when(targetUser.getDeletedAt()).thenReturn(null);
 
-            PageResponse<AdminUserByRoleItemResponse> response = adminUserService.listUsersByRole("user", 0, 20, null);
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
 
-            assertNotNull(response);
-            assertEquals(2, response.content().size());
-            assertEquals("user1", response.content().get(0).loginName());
-            assertEquals("user", response.content().get(0).accessLevel());
-            assertEquals(0, response.page());
-            assertEquals(20, response.size());
-            assertEquals(2, response.totalElements());
-            assertEquals(1, response.totalPages());
-        }
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
 
-        @Test
-        @DisplayName("listUsersByState devuelve usuarios paginados")
-        void listUsersByState_success() {
-            AppUser user1 = buildUser(10, "user1", AccessLevel.user, AccountState.active);
-            AppUser user2 = buildUser(11, "user2", AccessLevel.moderator, AccountState.active);
-            Page<AppUser> page = new PageImpl<>(List.of(user1, user2), PageRequest.of(0, 20), 2);
+        UpdateUserAccessLevelRequest request = new UpdateUserAccessLevelRequest("superadmin");
 
-            when(appUserRepository.findByAccountStateAndDeletedAtIsNull(eq(AccountState.active), any(Pageable.class)))
-                    .thenReturn(page);
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> adminUserService.updateAccessLevel(targetUserId, request)
+        );
 
-            PageResponse<AdminUserByStateItemResponse> response = adminUserService.listUsersByState("active", 0, 20, null);
-
-            assertNotNull(response);
-            assertEquals(2, response.content().size());
-            assertEquals("user1", response.content().get(0).loginName());
-            assertEquals("active", response.content().get(0).accountState());
-            assertEquals(2, response.totalElements());
-        }
-
-        @Test
-        @DisplayName("getUserHistory devuelve eventos ordenados desde repositorio")
-        void getUserHistory_success() {
-            AppUser targetUser = buildUser(10, "autor", AccessLevel.user, AccountState.active);
-
-            UserChangeHistory event1 = new UserChangeHistory();
-            event1.setUserId(10);
-            event1.setChangedField("accessLevel");
-            event1.setOldValue("user");
-            event1.setNewValue("moderator");
-            event1.setChangedAt(LocalDateTime.now().minusDays(1));
-            event1.setChangedByUserId(1);
-
-            UserChangeHistory event2 = new UserChangeHistory();
-            event2.setUserId(10);
-            event2.setChangedField("accountState");
-            event2.setOldValue("active");
-            event2.setNewValue("suspended");
-            event2.setChangedAt(LocalDateTime.now());
-            event2.setChangedByUserId(1);
-
-            when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
-            when(userChangeHistoryRepository.findByUserIdOrderByChangedAtDesc(eq(10), any(PageRequest.class)))
-                    .thenReturn(new PageImpl<>(List.of(event2, event1)));
-
-            UserHistoryResponse response = adminUserService.getUserHistory(10);
-
-            assertNotNull(response);
-            assertEquals(2, response.events().size());
-            assertEquals("accountState", response.events().get(0).changedField());
-            assertEquals("accessLevel", response.events().get(1).changedField());
-        }
+        assertEquals("accessLevel inválido", ex.getMessage());
+        verify(appUserRepository, never()).save(any());
+        verify(userChangeHistoryRepository, never()).save(any());
     }
 
-    private AppUser buildUser(Integer id, String loginName, AccessLevel accessLevel, AccountState accountState) {
-        AppUser user = new AppUser();
-        user.setId(id);
-        user.setLoginName(loginName);
-        user.setEmailAddress(loginName + "@test.com");
-        user.setPasswordHash("hashed");
-        user.setDisplayName("Display " + loginName);
-        user.setAccessLevel(accessLevel);
-        user.setAccountState(accountState);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-        return user;
+    @Test
+    void updateAccountState_deberiaActualizarYRevocarSesiones_siEsBanned() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
+
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
+        AppUser savedUser = mock(AppUser.class);
+
+        Object session1 = mock(Object.class, invocation -> null);
+        Object session2 = mock(Object.class, invocation -> null);
+
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+
+        when(targetUser.getDeletedAt()).thenReturn(null);
+        when(targetUser.getAccountState()).thenReturn(AccountState.active);
+        when(targetUser.getId()).thenReturn(targetUserId);
+
+        when(adminUser.getId()).thenReturn(adminId);
+
+        when(userSessionRepository.findByUserIdAndRevokedAtIsNull(targetUserId))
+                .thenReturn(List.of(
+                        (com.nunclear.escritores.entity.UserSession) session1,
+                        (com.nunclear.escritores.entity.UserSession) session2
+                ));
+
+        when(appUserRepository.save(targetUser)).thenReturn(savedUser);
+        when(savedUser.getId()).thenReturn(targetUserId);
+        when(savedUser.getAccountState()).thenReturn(AccountState.banned);
+        when(savedUser.getUpdatedAt()).thenReturn(LocalDateTime.of(2026, 4, 22, 11, 0));
+
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
+
+        UpdateUserAccountStateRequest request = new UpdateUserAccountStateRequest("banned");
+
+        AdminUserAccountStateResponse response = adminUserService.updateAccountState(targetUserId, request);
+
+        assertNotNull(response);
+        assertEquals(targetUserId, response.id());
+        assertEquals("banned", response.accountState());
+        assertEquals(LocalDateTime.of(2026, 4, 22, 11, 0), response.updatedAt());
+
+        verify(targetUser).setAccountState(AccountState.banned);
+        verify(userSessionRepository).findByUserIdAndRevokedAtIsNull(targetUserId);
+        verify(userSessionRepository, times(2)).save(any());
+
+        ArgumentCaptor<UserChangeHistory> historyCaptor = ArgumentCaptor.forClass(UserChangeHistory.class);
+        verify(userChangeHistoryRepository).save(historyCaptor.capture());
+
+        UserChangeHistory history = historyCaptor.getValue();
+        assertEquals("accountState", history.getChangedField());
+        assertEquals("active", history.getOldValue());
+        assertEquals("banned", history.getNewValue());
+        assertEquals(adminId, history.getChangedByUserId());
     }
 
-    private void setAuthenticatedUser(AppUser user) {
-        CustomUserDetails userDetails = new CustomUserDetails(user);
-        Authentication authentication = mock(Authentication.class);
-        SecurityContext securityContext = mock(SecurityContext.class);
+    @Test
+    void updateAccountState_noDebeRevocarSesiones_siNoEsBanned() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
 
-        when(authentication.getPrincipal()).thenReturn(userDetails);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        SecurityContextHolder.setContext(securityContext);
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
+        AppUser savedUser = mock(AppUser.class);
+
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+
+        when(targetUser.getDeletedAt()).thenReturn(null);
+        when(targetUser.getAccountState()).thenReturn(AccountState.pending_verification);
+
+        when(adminUser.getId()).thenReturn(adminId);
+
+        when(savedUser.getId()).thenReturn(targetUserId);
+        when(savedUser.getAccountState()).thenReturn(AccountState.active);
+        when(savedUser.getUpdatedAt()).thenReturn(LocalDateTime.of(2026, 4, 22, 12, 0));
+
+        when(appUserRepository.save(targetUser)).thenReturn(savedUser);
+
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
+
+        UpdateUserAccountStateRequest request = new UpdateUserAccountStateRequest("active");
+
+        AdminUserAccountStateResponse response = adminUserService.updateAccountState(targetUserId, request);
+
+        assertEquals("active", response.accountState());
+        verify(userSessionRepository, never()).findByUserIdAndRevokedAtIsNull(anyInt());
+    }
+
+    @Test
+    void updateAccountState_deberiaLanzarBadRequest_siEstadoInvalido() {
+        Integer targetUserId = 10;
+        Integer adminId = 99;
+
+        AppUser targetUser = mock(AppUser.class);
+        AppUser adminUser = mock(AppUser.class);
+
+        when(appUserRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(appUserRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+        when(targetUser.getDeletedAt()).thenReturn(null);
+
+        CustomUserDetails principal = mock(CustomUserDetails.class);
+        when(principal.getId()).thenReturn(adminId);
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
+
+        UpdateUserAccountStateRequest request = new UpdateUserAccountStateRequest("estado-raro");
+
+        BadRequestException ex = assertThrows(
+                BadRequestException.class,
+                () -> adminUserService.updateAccountState(targetUserId, request)
+        );
+
+        assertEquals("accountState inválido", ex.getMessage());
+        verify(appUserRepository, never()).save(any());
+    }
+
+    @Test
+    void getUserHistory_deberiaRetornarEventosOrdenados() {
+        Integer userId = 10;
+
+        AppUser user = mock(AppUser.class);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(null);
+
+        UserChangeHistory event1 = new UserChangeHistory();
+        event1.setChangedField("accessLevel");
+        event1.setOldValue("user");
+        event1.setNewValue("admin");
+        event1.setChangedAt(LocalDateTime.of(2026, 4, 22, 9, 0));
+        event1.setChangedByUserId(99);
+
+        UserChangeHistory event2 = new UserChangeHistory();
+        event2.setChangedField("accountState");
+        event2.setOldValue("active");
+        event2.setNewValue("banned");
+        event2.setChangedAt(LocalDateTime.of(2026, 4, 22, 8, 0));
+        event2.setChangedByUserId(99);
+
+        Page<UserChangeHistory> page = new PageImpl<>(List.of(event1, event2));
+
+        when(userChangeHistoryRepository.findByUserIdOrderByChangedAtDesc(eq(userId), any(Pageable.class)))
+                .thenReturn(page);
+
+        UserHistoryResponse response = adminUserService.getUserHistory(userId);
+
+        assertNotNull(response);
+        assertEquals(2, response.events().size());
+
+        UserHistoryEventResponse first = response.events().get(0);
+        assertEquals("accessLevel", first.changedField());
+        assertEquals("user", first.oldValue());
+        assertEquals("admin", first.newValue());
+        assertEquals(99, first.changedByUserId());
+    }
+
+    @Test
+    void listUsersByRole_deberiaRetornarPageResponse() {
+        AppUser user1 = mock(AppUser.class);
+        AppUser user2 = mock(AppUser.class);
+
+        when(user1.getId()).thenReturn(1);
+        when(user1.getLoginName()).thenReturn("juan");
+        when(user1.getAccessLevel()).thenReturn(AccessLevel.admin);
+
+        when(user2.getId()).thenReturn(2);
+        when(user2.getLoginName()).thenReturn("ana");
+        when(user2.getAccessLevel()).thenReturn(AccessLevel.admin);
+
+        Page<AppUser> page = new PageImpl<>(
+                List.of(user1, user2),
+                PageRequest.of(0, 20),
+                2
+        );
+
+        when(appUserRepository.findByAccessLevelAndDeletedAtIsNull(eq(AccessLevel.admin), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<AdminUserByRoleItemResponse> response =
+                adminUserService.listUsersByRole("admin", 0, 20, "loginName,asc");
+
+        assertNotNull(response);
+        assertEquals(2, response.content().size());
+        assertEquals(0, response.page());
+        assertEquals(20, response.size());
+        assertEquals(2, response.totalElements());
+        assertEquals(1, response.totalPages());
+
+        assertEquals("juan", response.content().get(0).loginName());
+        assertEquals("admin", response.content().get(0).accessLevel());
+    }
+
+    @Test
+    void listUsersByState_deberiaRetornarPageResponse() {
+        AppUser user1 = mock(AppUser.class);
+
+        when(user1.getId()).thenReturn(1);
+        when(user1.getLoginName()).thenReturn("pedro");
+        when(user1.getAccountState()).thenReturn(AccountState.active);
+
+        Page<AppUser> page = new PageImpl<>(
+                List.of(user1),
+                PageRequest.of(0, 20),
+                1
+        );
+
+        when(appUserRepository.findByAccountStateAndDeletedAtIsNull(eq(AccountState.active), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<AdminUserByStateItemResponse> response =
+                adminUserService.listUsersByState("active", 0, 20, null);
+
+        assertNotNull(response);
+        assertEquals(1, response.content().size());
+        assertEquals("pedro", response.content().get(0).loginName());
+        assertEquals("active", response.content().get(0).accountState());
+    }
+
+    @Test
+    void deberiaLanzarResourceNotFound_siUsuarioObjetivoNoExiste() {
+        when(appUserRepository.findById(123)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> adminUserService.getUserHistory(123)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void deberiaLanzarResourceNotFound_siUsuarioObjetivoEstaEliminado() {
+        AppUser user = mock(AppUser.class);
+        when(appUserRepository.findById(123)).thenReturn(Optional.of(user));
+        when(user.getDeletedAt()).thenReturn(LocalDateTime.now());
+
+        ResourceNotFoundException ex = assertThrows(
+                ResourceNotFoundException.class,
+                () -> adminUserService.getUserHistory(123)
+        );
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void deberiaLanzarUnauthorized_siPrincipalNoEsCustomUserDetails() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
+        );
+
+        AppUser targetUser = mock(AppUser.class);
+        when(appUserRepository.findById(10)).thenReturn(Optional.of(targetUser));
+        when(targetUser.getDeletedAt()).thenReturn(null);
+
+        UpdateUserAccessLevelRequest request = new UpdateUserAccessLevelRequest("admin");
+
+        UnauthorizedException ex = assertThrows(
+                UnauthorizedException.class,
+                () -> adminUserService.updateAccessLevel(10, request)
+        );
+
+        assertEquals("No autenticado", ex.getMessage());
     }
 }
