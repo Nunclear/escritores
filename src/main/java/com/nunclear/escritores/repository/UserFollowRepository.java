@@ -20,6 +20,4 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Integer>
     Optional<UserFollow> findByFollowerUserIdAndFollowedUserId(Integer followerUserId, Integer followedUserId);
 
     void deleteByFollowerUserIdAndFollowedUserId(Integer followerUserId, Integer followedUserId);
-
-    long countByFollowerUserId(Integer followerUserId);
 }

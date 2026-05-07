@@ -12,6 +12,4 @@ public interface UserSanctionRepository extends JpaRepository<UserSanction, Inte
     Page<UserSanction> findByTargetUserIdAndIsActiveTrue(Integer targetUserId, Pageable pageable);
 
     Page<UserSanction> findByIsActiveTrue(Pageable pageable);
-
-    long countByIsActiveTrue();
 }

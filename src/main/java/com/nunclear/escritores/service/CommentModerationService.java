@@ -86,8 +86,7 @@ public class CommentModerationService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages(),
-                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
+                result.getTotalPages()
         );
     }
 
@@ -117,8 +116,7 @@ public class CommentModerationService {
                 reports.getNumber(),
                 reports.getSize(),
                 reports.getTotalElements(),
-                reports.getTotalPages(),
-                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
+                reports.getTotalPages()
         );
     }
 
@@ -136,8 +134,7 @@ public class CommentModerationService {
                 reports.getNumber(),
                 reports.getSize(),
                 reports.getTotalElements(),
-                reports.getTotalPages(),
-                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
+                reports.getTotalPages()
         );
     }
 

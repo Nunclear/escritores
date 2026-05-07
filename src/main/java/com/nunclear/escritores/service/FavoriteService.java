@@ -89,8 +89,7 @@ public class FavoriteService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages(),
-                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
+                result.getTotalPages()
         );
     }
 

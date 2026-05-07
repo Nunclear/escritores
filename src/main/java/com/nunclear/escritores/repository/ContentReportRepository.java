@@ -81,7 +81,5 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, In
             @Param("chapterId") Integer chapterId,
             Pageable pageable
     );
-
-    long countByStatusNameIgnoreCase(String statusName);
 }
 
