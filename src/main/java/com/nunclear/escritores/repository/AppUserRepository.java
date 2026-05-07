@@ -18,11 +18,15 @@ public interface AppUserRepository extends JpaRepository<AppUser, Integer> {
 
     boolean existsByPendingEmailAddressIgnoreCase(String pendingEmailAddress);
 
+    long countByDeletedAtIsNull();
+
     Optional<AppUser> findByLoginNameIgnoreCase(String loginName);
 
     Optional<AppUser> findByEmailAddressIgnoreCase(String emailAddress);
 
     Optional<AppUser> findByLoginNameIgnoreCaseOrEmailAddressIgnoreCase(String loginName, String emailAddress);
+
+
 
     @Query("""
             SELECT u
@@ -44,6 +48,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Integer> {
     Page<AppUser> findByAccessLevelAndDeletedAtIsNull(AccessLevel accessLevel, Pageable pageable);
 
     Page<AppUser> findByAccountStateAndDeletedAtIsNull(AccountState accountState, Pageable pageable);
+
+    long countByDeletedAtIsNull();
 
     long countByDeletedAtIsNullAndAccountState(AccountState accountState);
 }

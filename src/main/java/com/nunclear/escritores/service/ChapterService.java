@@ -123,7 +123,8 @@ public class ChapterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
@@ -154,7 +155,8 @@ public class ChapterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
@@ -175,6 +177,7 @@ public class ChapterService {
 
             if (ownStoryIds.isEmpty()) {
                 return new PageResponse<>(List.of(), page, size, 0, 0);
+
             }
 
             Page<Chapter> result = chapterRepository.findDraftsByStoryIds(ownStoryIds, pageable);
@@ -212,7 +215,8 @@ public class ChapterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
@@ -329,7 +333,8 @@ public class ChapterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 

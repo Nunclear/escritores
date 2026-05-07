@@ -109,7 +109,8 @@ public class CharacterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
@@ -142,7 +143,8 @@ public class CharacterService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
