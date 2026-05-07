@@ -103,7 +103,8 @@ public class VolumeService {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.getTotalPages()
+                result.getTotalPages(),
+                com.nunclear.escritores.util.PageUtils.sortAsList(sort, "createdAt,desc")
         );
     }
 
