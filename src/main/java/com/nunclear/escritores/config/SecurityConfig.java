@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableMethodSecurity
@@ -30,6 +31,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/auth/register",
                                 "/auth/login",
@@ -86,6 +88,7 @@ public class SecurityConfig {
                                 "/metrics/views/chapter",
                                 "/metrics/stories/top-viewed"
                         ).permitAll()
+                        .requestMatchers("/dashboard/**").authenticated()
                         .requestMatchers("/ideas/**").authenticated()
                         .requestMatchers("/favorites/**").authenticated()
                         .requestMatchers("/follows/**").authenticated()

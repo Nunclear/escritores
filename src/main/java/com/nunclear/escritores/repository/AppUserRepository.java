@@ -50,4 +50,5 @@ public interface AppUserRepository extends JpaRepository<AppUser, Integer> {
     Page<AppUser> findByAccountStateAndDeletedAtIsNull(AccountState accountState, Pageable pageable);
 
     long countByDeletedAtIsNullAndAccountState(AccountState accountState);
+
 }

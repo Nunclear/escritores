@@ -83,4 +83,11 @@ public interface StoryRepository extends JpaRepository<Story, Integer> {
             Pageable pageable
     );
     List<Story> findByOwnerUserId(Integer ownerUserId);
+
+
+    long countByOwnerUserId(Integer ownerUserId);
+
+    long countByOwnerUserIdAndPublicationStateIgnoreCaseAndArchivedAtIsNull(Integer ownerUserId, String publicationState);
+
+    long countByArchivedAtIsNull();
 }

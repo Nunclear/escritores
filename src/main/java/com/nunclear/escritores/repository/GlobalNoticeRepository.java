@@ -21,4 +21,14 @@ public interface GlobalNoticeRepository extends JpaRepository<GlobalNotice, Inte
     Page<GlobalNotice> findActiveNotices(@Param("now") LocalDateTime now, Pageable pageable);
 
     Page<GlobalNotice> findByArchivedFalse(Pageable pageable);
+
+    @Query("""
+        SELECT COUNT(n)
+        FROM GlobalNotice n
+        WHERE n.archived = false
+          AND n.isEnabled = true
+          AND (n.startsAt IS NULL OR n.startsAt <= :now)
+          AND (n.endsAt IS NULL OR n.endsAt >= :now)
+        """)
+    long countActiveNotices(@Param("now") java.time.LocalDateTime now);
 }

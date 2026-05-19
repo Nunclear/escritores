@@ -18,4 +18,6 @@ public interface StoryFavoriteRepository extends JpaRepository<StoryFavorite, In
     long countByStoryId(Integer storyId);
 
     void deleteByUserIdAndStoryId(Integer userId, Integer storyId);
+
+    long countByUserId(Integer userId);
 }

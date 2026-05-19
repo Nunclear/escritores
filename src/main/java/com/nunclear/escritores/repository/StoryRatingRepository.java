@@ -22,5 +22,6 @@ public interface StoryRatingRepository extends JpaRepository<StoryRating, Intege
     Double findAverageScoreByStoryId(@Param("storyId") Integer storyId);
 
     long countByStoryId(Integer storyId);
-    long countByChapterIdAndDeletedAtIsNull(Integer chapterId);
+
+    Page<StoryRating> findByAuthorUserId(Integer authorUserId, Pageable pageable);
 }

@@ -16,4 +16,8 @@ public interface StoryCommentRepository extends JpaRepository<StoryComment, Inte
     Page<StoryComment> findByVisibilityStateIgnoreCaseAndDeletedAtIsNull(String visibilityState, Pageable pageable);
 
     long countByChapterIdAndDeletedAtIsNull(Integer chapterId);
+
+    Page<StoryComment> findByAuthorUserIdAndDeletedAtIsNull(Integer authorUserId, Pageable pageable);
+
+    long countByAuthorUserIdAndDeletedAtIsNull(Integer authorUserId);
 }
