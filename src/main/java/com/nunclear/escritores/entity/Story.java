@@ -1,5 +1,7 @@
 package com.nunclear.escritores.entity;
 
+import com.nunclear.escritores.enums.CompletionState;
+import com.nunclear.escritores.enums.AgeRating;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -58,6 +60,20 @@ public class Story {
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
+
+    @Column(name = "language", length = 10)
+    private String language;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "completion_state", length = 30)
+    private CompletionState completionState;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "age_rating", length = 30)
+    private AgeRating ageRating;
+
+    @Column(name = "content_warnings", columnDefinition = "JSON")
+    private String contentWarnings;
 
     @PrePersist
     public void prePersist() {

@@ -65,6 +65,12 @@ public class AppUser {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "preferred_language", length = 10)
+    private String preferredLanguage;
+
+    @Column(name = "notification_preferences", columnDefinition = "JSON")
+    private String notificationPreferences;
+
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();

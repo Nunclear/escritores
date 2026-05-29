@@ -56,6 +56,12 @@ public class Chapter {
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
 
+    @Column(name = "author_note", columnDefinition = "TEXT")
+    private String authorNote;
+
+    @Column(name = "scheduled_publish_at")
+    private LocalDateTime scheduledPublishAt;
+
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
