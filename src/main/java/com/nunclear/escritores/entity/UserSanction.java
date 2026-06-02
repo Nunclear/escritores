@@ -3,14 +3,14 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
+import com.nunclear.escritores.entity.Auditable;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_sanction")
 @Getter
 @Setter
-public class UserSanction {
+public class UserSanction extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,24 +37,13 @@ public class UserSanction {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    // createdAt and updatedAt are inherited from Auditable
 
     @PrePersist
     public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
+        // Auditable.onCreate() will set createdAt and updatedAt
         if (this.isActive == null) {
             this.isActive = true;
         }
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

@@ -5,7 +5,6 @@ import com.nunclear.escritores.dto.request.ReorderArcItemRequest;
 import com.nunclear.escritores.dto.request.ReorderArcsRequest;
 import com.nunclear.escritores.dto.request.UpdateArcRequest;
 import com.nunclear.escritores.dto.response.*;
-import com.nunclear.escritores.entity.AppUser;
 import com.nunclear.escritores.entity.Arc;
 import com.nunclear.escritores.entity.Story;
 import com.nunclear.escritores.exception.BadRequestException;
@@ -14,11 +13,11 @@ import com.nunclear.escritores.exception.UnauthorizedException;
 import com.nunclear.escritores.repository.AppUserRepository;
 import com.nunclear.escritores.repository.ArcRepository;
 import com.nunclear.escritores.repository.StoryRepository;
-import com.nunclear.escritores.security.CustomUserDetails;
+import com.nunclear.escritores.util.PaginationUtils;
+import com.nunclear.escritores.util.StoryAccessUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -29,7 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ArcService {
 
-    private static final String STORY_NOT_FOUND = "Historia no encontrada";
+    // La cadena de error de historia se utiliza desde StoryAccessUtils.STORY_NOT_FOUND
     private static final String SORT_POSITION_INDEX = "positionIndex";
     private static final String SORT_CREATED_AT = "createdAt";
     private static final String SORT_UPDATED_AT = "updatedAt";
@@ -40,7 +39,7 @@ public class ArcService {
     private final AppUserRepository appUserRepository;
 
     public CreateArcResponse createArc(CreateArcRequest request) {
-        Story story = getEditableStory(request.storyId());
+        Story story = StoryAccessUtils.getEditableStory(request.storyId(), storyRepository, appUserRepository);
 
         Arc arc = new Arc();
         arc.setStoryId(story.getId());
@@ -63,9 +62,8 @@ public class ArcService {
                 .orElseThrow(() -> new ResourceNotFoundException("Arco no encontrado"));
 
         Story story = storyRepository.findById(arc.getStoryId())
-                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
-
-        validateReadAccess(story);
+                .orElseThrow(() -> new ResourceNotFoundException(StoryAccessUtils.STORY_NOT_FOUND));
+        StoryAccessUtils.validateReadAccess(story, appUserRepository);
 
         return new ArcDetailResponse(
                 arc.getId(),
@@ -78,14 +76,14 @@ public class ArcService {
 
     public PageResponse<ArcListItemResponse> getArcsByStory(Integer storyId, int page, int size, String sort) {
         Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(StoryAccessUtils.STORY_NOT_FOUND));
+        StoryAccessUtils.validateReadAccess(story, appUserRepository);
 
-        validateReadAccess(story);
-
-        Pageable pageable = buildPageable(
+        Pageable pageable = PaginationUtils.buildPageable(
                 page,
                 size,
-                sort == null || sort.isBlank() ? SORT_POSITION_INDEX + ",asc" : sort
+                (sort == null || sort.isBlank() ? SORT_POSITION_INDEX + ",asc" : sort),
+                this::mapSortField
         );
 
         Page<Arc> result = arcRepository.findByStoryId(storyId, pageable);
@@ -121,7 +119,8 @@ public class ArcService {
     }
 
     public MessageResponse reorderArcs(ReorderArcsRequest request) {
-        Story story = getEditableStory(request.storyId());
+        // Obtiene la historia editable mediante utilidades compartidas
+        Story story = StoryAccessUtils.getEditableStory(request.storyId(), storyRepository, appUserRepository);
 
         Map<Integer, Integer> requestedPositions = request.items().stream()
                 .collect(Collectors.toMap(ReorderArcItemRequest::arcId, ReorderArcItemRequest::positionIndex));
@@ -154,93 +153,10 @@ public class ArcService {
         Arc arc = arcRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Arco no encontrado"));
 
-        getEditableStory(arc.getStoryId());
+        StoryAccessUtils.getEditableStory(arc.getStoryId(), storyRepository, appUserRepository);
         return arc;
     }
-
-    private Story getEditableStory(Integer storyId) {
-        Story story = storyRepository.findById(storyId)
-                .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
-
-        AppUser currentUser = getAuthenticatedUser();
-        boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
-        boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
-
-        if (!isOwner && !isModeratorOrAdmin) {
-            throw new UnauthorizedException("No tienes permisos sobre esta historia");
-        }
-
-        return story;
-    }
-
-    private void validateReadAccess(Story story) {
-        boolean publicReadable =
-                "public".equalsIgnoreCase(story.getVisibilityState())
-                        && "published".equalsIgnoreCase(story.getPublicationState())
-                        && story.getArchivedAt() == null;
-
-        if (publicReadable) {
-            return;
-        }
-
-        AppUser currentUser = tryGetAuthenticatedUser();
-        if (currentUser == null) {
-            throw new ResourceNotFoundException(STORY_NOT_FOUND);
-        }
-
-        boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
-        boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
-
-        if (!isOwner && !isModeratorOrAdmin) {
-            throw new ResourceNotFoundException(STORY_NOT_FOUND);
-        }
-    }
-
-    private boolean isModeratorOrAdmin(AppUser user) {
-        return "moderator".equals(user.getAccessLevel().name()) || "admin".equals(user.getAccessLevel().name());
-    }
-
-    private AppUser getAuthenticatedUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthorizedException("No autenticado");
-        }
-
-        Object principal = authentication.getPrincipal();
-
-        if (!(principal instanceof CustomUserDetails userDetails)) {
-            throw new UnauthorizedException("No autenticado");
-        }
-
-        return appUserRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
-    }
-
-    private AppUser tryGetAuthenticatedUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || authentication.getPrincipal() == null) {
-            return null;
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (!(principal instanceof CustomUserDetails userDetails)) {
-            return null;
-        }
-
-        return appUserRepository.findById(userDetails.getId()).orElse(null);
-    }
-
-    private Pageable buildPageable(int page, int size, String sort) {
-        String[] sortParts = sort.split(",");
-        String field = sortParts[0];
-        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("desc")
-                ? Sort.Direction.DESC
-                : Sort.Direction.ASC;
-
-        return PageRequest.of(page, size, Sort.by(direction, mapSortField(field)));
-    }
+    // Métodos de autenticación, autorización y paginación eliminados en favor de utilidades compartidas.
 
     private String mapSortField(String field) {
         return switch (field) {

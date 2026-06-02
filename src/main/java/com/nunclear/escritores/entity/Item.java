@@ -3,14 +3,13 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
+import com.nunclear.escritores.entity.Auditable;
 
 @Entity
 @Table(name = "item")
 @Getter
 @Setter
-public class Item {
+public class Item extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,21 +30,4 @@ public class Item {
     @Column(name = "story_id", nullable = false)
     private Integer storyId;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }

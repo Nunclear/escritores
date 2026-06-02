@@ -3,36 +3,19 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
+import com.nunclear.escritores.entity.BaseToken;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "password_reset_token")
 @Getter
 @Setter
-public class PasswordResetToken {
+public class PasswordResetToken extends BaseToken {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "user_id", nullable = false)
-    private Integer userId;
-
-    @Column(name = "token_hash", nullable = false, length = 255)
-    private String tokenHash;
-
-    @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
-
+    /**
+     * Timestamp when this reset token was used.  Once this field is
+     * populated, the token should no longer be valid.
+     */
     @Column(name = "used_at")
     private LocalDateTime usedAt;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-    }
 }

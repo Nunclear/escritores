@@ -5,14 +5,14 @@ import com.nunclear.escritores.enums.AccountState;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
+import com.nunclear.escritores.entity.Auditable;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "app_user")
 @Getter
 @Setter
-public class AppUser {
+public class AppUser extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,24 +56,6 @@ public class AppUser {
     @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    @PrePersist
-    public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }
