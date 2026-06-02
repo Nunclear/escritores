@@ -13,6 +13,8 @@ public interface StoryGenreRepository extends JpaRepository<StoryGenre, Integer>
 
     void deleteByStoryId(Integer storyId);
 
+    void deleteByGenreId(Integer genreId);
+
     void deleteByStoryIdAndGenreId(Integer storyId, Integer genreId);
 
     boolean existsByStoryIdAndGenreId(Integer storyId, Integer genreId);

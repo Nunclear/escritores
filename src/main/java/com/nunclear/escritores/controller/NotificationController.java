@@ -86,6 +86,6 @@ public class NotificationController {
     private Integer getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
-        return userDetails.id();
+        return userDetails.getId();
     }
 }
