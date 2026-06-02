@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: escritores-test
+  
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+  security:
+    jwt:
+      secret: test-secret-key-for-testing-only-should-be-changed-in-production
+      expiration: 86400000 # 24 hours
+
+logging:
+  level:
+    root: WARN
+    com.nunclear.escritores: DEBUG
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate: WARN
