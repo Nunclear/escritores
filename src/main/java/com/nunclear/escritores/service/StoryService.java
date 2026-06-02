@@ -27,17 +27,29 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class StoryService {
 
-    // Mala práctica corregida:
-    // strings mágicos repetidos.
-    // Tipo: duplicación de literales / baja mantenibilidad.
     private static final String STORY_NOT_FOUND = "Historia no encontrada";
+    private static final String USER_NOT_FOUND = "Usuario no encontrado";
+    private static final String NOT_AUTHENTICATED = "No autenticado";
+
     private static final String PUBLICATION_PUBLISHED = "published";
     private static final String PUBLICATION_DRAFT = "draft";
+
     private static final String VISIBILITY_PUBLIC = "public";
+    private static final String VISIBILITY_PRIVATE = "private";
+
     private static final String ACCESS_MODERATOR = "moderator";
     private static final String ACCESS_ADMIN = "admin";
+
     private static final String SORT_CREATED_AT = "createdAt";
+    private static final String SORT_UPDATED_AT = "updatedAt";
+    private static final String SORT_TITLE = "title";
+    private static final String SORT_PUBLISHED_AT = "publishedAt";
+
     private static final String DEFAULT_CREATED_DESC_SORT = "createdAt,desc";
+    private static final String DEFAULT_UPDATED_DESC_SORT = "updatedAt,desc";
+
+    private static final Pattern DIACRITICAL_MARKS_PATTERN = Pattern.compile("\\p{M}");
+    private static final Pattern NON_SLUG_CHARACTERS_PATTERN = Pattern.compile("[^a-z0-9]+");
 
     private final StoryRepository storyRepository;
     private final AppUserRepository appUserRepository;
@@ -108,7 +120,11 @@ public class StoryService {
     }
 
     public PageResponse<StoryListItemResponse> listPublicStories(int page, int size, String sort) {
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
+        );
 
         Page<Story> result = storyRepository.findByVisibilityStateIgnoreCaseAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
                 VISIBILITY_PUBLIC,
@@ -141,14 +157,24 @@ public class StoryService {
             int size,
             String sort
     ) {
-        String finalVisibility = visibilityState == null || visibilityState.isBlank() ? VISIBILITY_PUBLIC : visibilityState;
-        String finalPublication = publicationState == null || publicationState.isBlank() ? PUBLICATION_PUBLISHED : publicationState;
+        String finalVisibility = visibilityState == null || visibilityState.isBlank()
+                ? VISIBILITY_PUBLIC
+                : visibilityState;
 
-        if (!VISIBILITY_PUBLIC.equalsIgnoreCase(finalVisibility) || !PUBLICATION_PUBLISHED.equalsIgnoreCase(finalPublication)) {
+        String finalPublication = publicationState == null || publicationState.isBlank()
+                ? PUBLICATION_PUBLISHED
+                : publicationState;
+
+        if (!VISIBILITY_PUBLIC.equalsIgnoreCase(finalVisibility)
+                || !PUBLICATION_PUBLISHED.equalsIgnoreCase(finalPublication)) {
             throw new BadRequestException("Solo se permite búsqueda pública de historias publicadas");
         }
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
+        );
 
         Page<Story> result = storyRepository.searchPublicStories(
                 q == null ? "" : q,
@@ -181,7 +207,11 @@ public class StoryService {
             int size,
             String sort
     ) {
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
+        );
 
         Page<Story> result;
         if (canSeePrivateStories(userId) && includeDrafts) {
@@ -208,7 +238,12 @@ public class StoryService {
 
     public PageResponse<UserStorySummaryResponse> getMyDrafts(int page, int size, String sort) {
         AppUser currentUser = getAuthenticatedUser();
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "updatedAt,desc" : sort);
+
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? DEFAULT_UPDATED_DESC_SORT : sort
+        );
 
         Page<Story> result = storyRepository.findByOwnerUserIdAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
                 currentUser.getId(),
@@ -234,9 +269,17 @@ public class StoryService {
 
     public PageResponse<ArchivedStoryItemResponse> getMyArchived(int page, int size, String sort) {
         AppUser currentUser = getAuthenticatedUser();
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "updatedAt,desc" : sort);
 
-        Page<Story> result = storyRepository.findByOwnerUserIdAndArchivedAtIsNotNull(currentUser.getId(), pageable);
+        Pageable pageable = buildPageable(
+                page,
+                size,
+                sort == null || sort.isBlank() ? DEFAULT_UPDATED_DESC_SORT : sort
+        );
+
+        Page<Story> result = storyRepository.findByOwnerUserIdAndArchivedAtIsNotNull(
+                currentUser.getId(),
+                pageable
+        );
 
         return new PageResponse<>(
                 result.getContent().stream()
@@ -374,6 +417,7 @@ public class StoryService {
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();
+
         boolean isOwner = story.getOwnerUserId().equals(currentUser.getId());
         boolean isModeratorOrAdmin = isModeratorOrAdmin(currentUser);
 
@@ -395,6 +439,7 @@ public class StoryService {
         }
 
         AppUser currentUser = tryGetAuthenticatedUser();
+
         if (currentUser == null) {
             throw new ResourceNotFoundException(STORY_NOT_FOUND);
         }
@@ -409,6 +454,7 @@ public class StoryService {
 
     private boolean canSeePrivateStories(Integer userId) {
         AppUser currentUser = tryGetAuthenticatedUser();
+
         if (currentUser == null) {
             return false;
         }
@@ -417,36 +463,29 @@ public class StoryService {
     }
 
     private boolean isModeratorOrAdmin(AppUser user) {
-        // Mala práctica corregida:
-        // strings mágicos repetidos para roles.
-        // Tipo: duplicación de literales / lógica repetida.
-        return ACCESS_MODERATOR.equals(user.getAccessLevel().name())
-                || ACCESS_ADMIN.equals(user.getAccessLevel().name());
+        String role = user.getAccessLevel().name();
+
+        return ACCESS_MODERATOR.equals(role) || ACCESS_ADMIN.equals(role);
     }
 
     private AppUser getAuthenticatedUser() {
-        // Mala práctica corregida:
-        // acceso directo a getAuthentication().getPrincipal() sin validar null.
-        // Tipo: riesgo de NullPointerException / validación defensiva insuficiente.
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthorizedException("No autenticado");
+            throw new UnauthorizedException(NOT_AUTHENTICATED);
         }
 
         Object principal = authentication.getPrincipal();
+
         if (!(principal instanceof CustomUserDetails userDetails)) {
-            throw new UnauthorizedException("No autenticado");
+            throw new UnauthorizedException(NOT_AUTHENTICATED);
         }
 
         return appUserRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
+                .orElseThrow(() -> new UnauthorizedException(USER_NOT_FOUND));
     }
 
     private AppUser tryGetAuthenticatedUser() {
-        // Mala práctica corregida:
-        // catch vacío o demasiado genérico para ocultar errores.
-        // Tipo: swallowing exceptions / ocultamiento silencioso de fallos.
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -454,6 +493,7 @@ public class StoryService {
         }
 
         Object principal = authentication.getPrincipal();
+
         if (!(principal instanceof CustomUserDetails userDetails)) {
             return null;
         }
@@ -462,7 +502,8 @@ public class StoryService {
     }
 
     private void validateVisibilityState(String visibilityState) {
-        if (!VISIBILITY_PUBLIC.equalsIgnoreCase(visibilityState) && !"private".equalsIgnoreCase(visibilityState)) {
+        if (!VISIBILITY_PUBLIC.equalsIgnoreCase(visibilityState)
+                && !VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityState)) {
             throw new BadRequestException("visibilityState inválido");
         }
     }
@@ -477,6 +518,7 @@ public class StoryService {
     private Pageable buildPageable(int page, int size, String sort) {
         String[] sortParts = sort.split(",");
         String field = sortParts[0];
+
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("desc")
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
@@ -487,9 +529,9 @@ public class StoryService {
     private String mapSortField(String field) {
         return switch (field) {
             case SORT_CREATED_AT -> SORT_CREATED_AT;
-            case "updatedAt" -> "updatedAt";
-            case "title" -> "title";
-            case "publishedAt" -> "publishedAt";
+            case SORT_UPDATED_AT -> SORT_UPDATED_AT;
+            case SORT_TITLE -> SORT_TITLE;
+            case SORT_PUBLISHED_AT -> SORT_PUBLISHED_AT;
             default -> SORT_CREATED_AT;
         };
     }
@@ -514,9 +556,11 @@ public class StoryService {
 
         while (true) {
             Story existing = storyRepository.findBySlugText(candidate).orElse(null);
+
             if (existing == null || existing.getId().equals(currentStoryId)) {
                 return candidate;
             }
+
             candidate = baseSlug + "-" + counter;
             counter++;
         }
@@ -524,20 +568,33 @@ public class StoryService {
 
     private String slugify(String input) {
         String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
-        String withoutAccents = Pattern.compile("\\p{M}").matcher(normalized).replaceAll("");
+        String withoutAccents = DIACRITICAL_MARKS_PATTERN.matcher(normalized).replaceAll("");
 
-        // Mala práctica corregida:
-        // precedencia implícita en regex.
-        // Tipo: expresión regular poco clara / legibilidad y riesgo de errores.
-        String slug = withoutAccents
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-+)|(-+$)", "");
+        String slugWithHyphens = NON_SLUG_CHARACTERS_PATTERN
+                .matcher(withoutAccents.toLowerCase(Locale.ROOT))
+                .replaceAll("-");
+
+        String slug = trimHyphens(slugWithHyphens);
 
         if (slug.isBlank()) {
             throw new BadRequestException("No se pudo generar slug para el título");
         }
 
         return slug;
+    }
+
+    private String trimHyphens(String value) {
+        int start = 0;
+        int end = value.length();
+
+        while (start < end && value.charAt(start) == '-') {
+            start++;
+        }
+
+        while (end > start && value.charAt(end - 1) == '-') {
+            end--;
+        }
+
+        return value.substring(start, end);
     }
 }
