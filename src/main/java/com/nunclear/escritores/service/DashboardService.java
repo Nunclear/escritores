@@ -11,6 +11,7 @@ import com.nunclear.escritores.repository.*;
 import com.nunclear.escritores.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+
+    private static final String CREATED_AT = "createdAt";
 
     private final AppUserRepository appUserRepository;
     private final StoryRepository storyRepository;
@@ -56,8 +59,11 @@ public class DashboardService {
     public PageResponse<RecentCommentDashboardItemResponse> getMyRecentComments(int page, int size, String sort) {
         AppUser currentUser = getAuthenticatedUser();
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "createdAt,desc" : sort);
-        Page<StoryComment> result = storyCommentRepository.findByAuthorUserIdAndDeletedAtIsNull(currentUser.getId(), pageable);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? CREATED_AT + ",desc" : sort);
+        Page<StoryComment> result = storyCommentRepository.findByAuthorUserIdAndDeletedAtIsNull(
+                currentUser.getId(),
+                pageable
+        );
 
         return new PageResponse<>(
                 result.getContent().stream()
@@ -77,7 +83,7 @@ public class DashboardService {
     public PageResponse<MyRatingDashboardItemResponse> getMyRatings(int page, int size, String sort) {
         AppUser currentUser = getAuthenticatedUser();
 
-        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? "createdAt,desc" : sort);
+        Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? CREATED_AT + ",desc" : sort);
         Page<StoryRating> result = storyRatingRepository.findByAuthorUserId(currentUser.getId(), pageable);
 
         return new PageResponse<>(
@@ -97,6 +103,7 @@ public class DashboardService {
 
     public AdminDashboardSummaryResponse getAdminSummary() {
         AppUser currentUser = getAuthenticatedUser();
+
         if (!"admin".equals(currentUser.getAccessLevel().name())) {
             throw new UnauthorizedException("Solo un admin puede ver este panel");
         }
@@ -119,6 +126,7 @@ public class DashboardService {
     public PageResponse<SystemActivityItemResponse> getSystemActivity(int page, int size) {
         AppUser currentUser = getAuthenticatedUser();
         String role = currentUser.getAccessLevel().name();
+
         if (!"moderator".equals(role) && !"admin".equals(role)) {
             throw new UnauthorizedException("No autorizado");
         }
@@ -126,10 +134,11 @@ public class DashboardService {
         int fetchSize = Math.max(size, 20);
 
         Page<ContentReport> reports = contentReportRepository.findAll(
-                PageRequest.of(0, fetchSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+                PageRequest.of(0, fetchSize, Sort.by(Sort.Direction.DESC, CREATED_AT))
         );
+
         Page<GlobalNotice> notices = globalNoticeRepository.findAll(
-                PageRequest.of(0, fetchSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+                PageRequest.of(0, fetchSize, Sort.by(Sort.Direction.DESC, CREATED_AT))
         );
 
         List<SystemActivityItemResponse> items = new ArrayList<>();
@@ -150,7 +159,12 @@ public class DashboardService {
             ));
         }
 
-        items.sort(Comparator.comparing(SystemActivityItemResponse::createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        items.sort(
+                Comparator.comparing(
+                        SystemActivityItemResponse::createdAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                )
+        );
 
         int fromIndex = Math.min(page * size, items.size());
         int toIndex = Math.min(fromIndex + size, items.size());
@@ -168,7 +182,14 @@ public class DashboardService {
     }
 
     private AppUser getAuthenticatedUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthorizedException("No autenticado");
+        }
+
+        Object principal = authentication.getPrincipal();
+
         if (!(principal instanceof CustomUserDetails userDetails)) {
             throw new UnauthorizedException("No autenticado");
         }
@@ -180,6 +201,7 @@ public class DashboardService {
     private Pageable buildPageable(int page, int size, String sort) {
         String[] sortParts = sort.split(",");
         String field = sortParts[0];
+
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("desc")
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
@@ -191,7 +213,7 @@ public class DashboardService {
         return switch (field) {
             case "updatedAt" -> "updatedAt";
             case "scoreValue" -> "scoreValue";
-            default -> "createdAt";
+            default -> CREATED_AT;
         };
     }
 }
