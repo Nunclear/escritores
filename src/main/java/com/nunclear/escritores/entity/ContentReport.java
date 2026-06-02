@@ -50,9 +50,19 @@ public class ContentReport extends Auditable {
 
     @PrePersist
     public void prePersist() {
-        // Auditable.onCreate() will set createdAt and updatedAt
+        // Initialize audit timestamps
+        super.onCreate();
+        // Ensure status has a default value
         if (this.statusName == null || this.statusName.isBlank()) {
             this.statusName = "pending";
         }
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this report.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
     }
 }

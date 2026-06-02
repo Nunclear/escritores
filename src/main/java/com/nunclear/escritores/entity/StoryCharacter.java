@@ -50,4 +50,20 @@ public class StoryCharacter extends Auditable {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    /**
+     * Initializes audit timestamps before persisting this story character.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this story character.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

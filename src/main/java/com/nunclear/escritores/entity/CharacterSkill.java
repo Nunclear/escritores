@@ -27,4 +27,20 @@ public class CharacterSkill extends Auditable {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    /**
+     * Initializes audit timestamps before persisting this character-skill relation.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this relation.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

@@ -44,4 +44,20 @@ public class StoryEvent extends Auditable {
     @Column(name = "chapter_id")
     private Integer chapterId;
 
+    /**
+     * Initializes audit timestamps before persisting this event.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this event.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

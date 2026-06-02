@@ -58,4 +58,23 @@ public class AppUser extends Auditable {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    /**
+     * Initializes the audit timestamps before this entity is persisted.
+     * Delegates to {@link Auditable#onCreate()} to set both
+     * {@code createdAt} and {@code updatedAt}.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this
+     * entity. Delegates to {@link Auditable#onUpdate()}.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
 }

@@ -65,12 +65,6 @@
 
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.12.6</version> <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.3</version>
             <scope>runtime</scope>
@@ -96,10 +90,15 @@
             <version>2.21.2</version>
         </dependency>
 
+        <!-- Add the JSR310 Java Time module for Jackson to handle Java 8/21
+             date/time types such as LocalDate and LocalDateTime.  Without
+             this module, SpringDoc and other components may fail to load
+             because they cannot find the {@code JavaTimeModule} class at
+             runtime.  This dependency ensures that the module is on the
+             classpath and is auto-registered by Spring Boot. -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -259,15 +258,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.5</version> <!-- La versión que tienes actual -->
-                <configuration>
-                    <testFailureIgnore>true</testFailureIgnore>
-                </configuration>
             </plugin>
         </plugins>
     </build>

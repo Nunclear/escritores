@@ -52,4 +52,20 @@ public class Story extends Auditable {
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
+
+    /**
+     * Initializes audit timestamps before persisting this story.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this story.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
 }

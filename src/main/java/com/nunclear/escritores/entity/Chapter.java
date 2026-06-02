@@ -49,4 +49,20 @@ public class Chapter extends Auditable {
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
+
+    /**
+     * Initializes auditing timestamps before persisting this chapter.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this chapter.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
 }

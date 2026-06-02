@@ -27,4 +27,20 @@ public class Arc extends Auditable {
     @Column(name = "position_index")
     private Integer positionIndex;
 
+    /**
+     * Lifecycle callback to initialize the audit fields before persisting.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Lifecycle callback to update the {@code updatedAt} field before updating.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

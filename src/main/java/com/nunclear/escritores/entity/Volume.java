@@ -27,4 +27,20 @@ public class Volume extends Auditable {
     @Column(name = "position_index")
     private Integer positionIndex;
 
+    /**
+     * Initializes audit timestamps before persisting this volume.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this volume.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

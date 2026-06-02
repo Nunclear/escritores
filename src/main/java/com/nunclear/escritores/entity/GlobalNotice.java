@@ -38,12 +38,22 @@ public class GlobalNotice extends Auditable {
 
     @PrePersist
     public void prePersist() {
-        // Auditable.onCreate() will set createdAt and updatedAt
+        // Initialize audit timestamps
+        super.onCreate();
+        // Set default values if they were not explicitly provided
         if (this.isEnabled == null) {
             this.isEnabled = false;
         }
         if (this.archived == null) {
             this.archived = false;
         }
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this notice.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
     }
 }

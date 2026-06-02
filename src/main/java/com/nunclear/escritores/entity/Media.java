@@ -33,4 +33,20 @@ public class Media extends Auditable {
     @Column(name = "storage_path", length = 500)
     private String storagePath;
 
+    /**
+     * Initializes audit timestamps before persisting this media.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp before updating this media.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

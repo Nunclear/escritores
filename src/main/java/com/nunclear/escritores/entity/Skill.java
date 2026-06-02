@@ -30,4 +30,20 @@ public class Skill extends Auditable {
     @Column(name = "story_id", nullable = false)
     private Integer storyId;
 
+    /**
+     * Initializes auditing timestamps before persisting this skill.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this skill.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

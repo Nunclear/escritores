@@ -30,4 +30,20 @@ public class Item extends Auditable {
     @Column(name = "story_id", nullable = false)
     private Integer storyId;
 
+    /**
+     * Populates the audit timestamps before persisting.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp before updating.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

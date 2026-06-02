@@ -24,4 +24,20 @@ public class Idea extends Auditable {
     @Column(name = "story_id", nullable = false)
     private Integer storyId;
 
+    /**
+     * Sets the audit timestamps before persisting this entity.
+     */
+    @PrePersist
+    public void prePersist() {
+        super.onCreate();
+    }
+
+    /**
+     * Updates the {@code updatedAt} timestamp prior to updating this entity.
+     */
+    @PreUpdate
+    public void preUpdate() {
+        super.onUpdate();
+    }
+
 }

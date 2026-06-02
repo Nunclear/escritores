@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 import com.nunclear.escritores.entity.Auditable;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "story_comment")
 @Getter
@@ -36,16 +38,25 @@ public class StoryComment extends Auditable {
     @Column(name = "edited_at")
     private LocalDateTime editedAt;
 
-    // createdAt and updatedAt are inherited from Auditable
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @PrePersist
     public void prePersist() {
-        // Auditable.onCreate() will set createdAt and updatedAt
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
         if (this.visibilityState == null || this.visibilityState.isBlank()) {
             this.visibilityState = "visible";
         }
+    }
+
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }
