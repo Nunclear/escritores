@@ -117,6 +117,22 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Swagger/OpenAPI documentation -->
+        <!--
+         Use springdoc-openapi v3 when running on Spring Boot 4.
+         The 3.x line of springdoc-openapi is compatible with Spring Boot 4,
+         Java 21+ and OpenAPI 3.1, and resolves missing class exceptions such
+         as the `WebMvcProperties` error observed with version 2.x.  See the
+         Springdoc OpenAPI compatibility matrix and blog posts for details【797650817932488†screenshot】.
+         This dependency brings Swagger UI at `/swagger-ui.html` and the
+         OpenAPI specification endpoints `/v3/api-docs` and `/v3/api-docs.yaml`.
+         -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
