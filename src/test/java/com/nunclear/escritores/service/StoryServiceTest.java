@@ -553,16 +553,18 @@ class StoryServiceTest {
         when(storyRepository.findById(10)).thenReturn(Optional.of(story));
         when(story.getOwnerUserId()).thenReturn(1);
 
+        UpdateStoryRequest request = new UpdateStoryRequest(
+                "Nuevo",
+                "Desc",
+                null,
+                "public",
+                true,
+                true
+        );
+
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> storyService.updateStory(10, new UpdateStoryRequest(
-                        "Nuevo",
-                        "Desc",
-                        null,
-                        "public",
-                        true,
-                        true
-                ))
+                () -> storyService.updateStory(10, request)
         );
 
         assertEquals("No tienes permisos para modificar esta historia", ex.getMessage());
@@ -780,18 +782,20 @@ class StoryServiceTest {
                 new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
         );
 
+        CreateStoryRequest request = new CreateStoryRequest(
+                "Título",
+                "Desc",
+                null,
+                "public",
+                "draft",
+                true,
+                true,
+                null
+        );
+
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> storyService.createStory(new CreateStoryRequest(
-                        "Título",
-                        "Desc",
-                        null,
-                        "public",
-                        "draft",
-                        true,
-                        true,
-                        null
-                ))
+                () -> storyService.createStory(request)
         );
 
         assertEquals("No autenticado", ex.getMessage());
@@ -805,18 +809,20 @@ class StoryServiceTest {
         mockAuthenticatedUser(principal);
         when(appUserRepository.findById(999)).thenReturn(Optional.empty());
 
+        CreateStoryRequest request = new CreateStoryRequest(
+                "Título",
+                "Desc",
+                null,
+                "public",
+                "draft",
+                true,
+                true,
+                null
+        );
+
         ResourceNotFoundException ex = assertThrows(
                 ResourceNotFoundException.class,
-                () -> storyService.createStory(new CreateStoryRequest(
-                        "Título",
-                        "Desc",
-                        null,
-                        "public",
-                        "draft",
-                        true,
-                        true,
-                        null
-                ))
+                () -> storyService.createStory(request)
         );
 
         assertEquals("Usuario no encontrado", ex.getMessage());
@@ -932,12 +938,15 @@ class StoryServiceTest {
 
     @Test
     void searchStories_deberiaLanzarBadRequest_siBuscaPrivate() {
+        String visibilityState = "private";
+
         BadRequestException ex = assertThrows(
                 BadRequestException.class,
-                () -> storyService.searchStories("aventura", "private", "published", 0, 20, null)
+                () -> storyService.searchStories("misterio", visibilityState, "published", 0, 20, "title,asc")
         );
 
         assertEquals("Solo se permite búsqueda pública de historias publicadas", ex.getMessage());
+        verify(storyRepository, never()).searchPublicStories(anyString(), anyString(), anyString(), any(Pageable.class));
     }
 
     @Test
@@ -967,13 +976,11 @@ class StoryServiceTest {
 
     @Test
     void getMyDrafts_deberiaLanzarUnauthorized_siNoAutenticado() {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
-        );
+        SecurityContextHolder.clearContext();
 
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> storyService.getMyDrafts(0, 20, null)
+                () -> storyService.getMyDrafts(0, 20, "createdAt,desc")
         );
 
         assertEquals("No autenticado", ex.getMessage());
@@ -1072,16 +1079,18 @@ class StoryServiceTest {
                 new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
         );
 
+        UpdateStoryRequest request = new UpdateStoryRequest(
+                "Nuevo",
+                "Desc",
+                null,
+                "public",
+                true,
+                true
+        );
+
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> storyService.updateStory(10, new UpdateStoryRequest(
-                        "Nuevo",
-                        "Desc",
-                        null,
-                        "public",
-                        true,
-                        true
-                ))
+                () -> storyService.updateStory(10, request)
         );
 
         assertEquals("No autenticado", ex.getMessage());
@@ -1097,16 +1106,18 @@ class StoryServiceTest {
 
         when(storyRepository.findById(999)).thenReturn(Optional.empty());
 
+        UpdateStoryRequest request = new UpdateStoryRequest(
+                "Nuevo",
+                "Desc",
+                null,
+                "public",
+                true,
+                true
+        );
+
         ResourceNotFoundException ex = assertThrows(
                 ResourceNotFoundException.class,
-                () -> storyService.updateStory(999, new UpdateStoryRequest(
-                        "Nuevo",
-                        "Desc",
-                        null,
-                        "public",
-                        true,
-                        true
-                ))
+                () -> storyService.updateStory(999, request)
         );
 
         assertEquals("Historia no encontrada", ex.getMessage());
@@ -1246,9 +1257,11 @@ class StoryServiceTest {
                 new UsernamePasswordAuthenticationToken("anonymousUser", null, List.of())
         );
 
+        DuplicateStoryRequest request = new DuplicateStoryRequest("Copia");
+
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> storyService.duplicateStory(10, new DuplicateStoryRequest("Copia"))
+                () -> storyService.duplicateStory(10, request)
         );
 
         assertEquals("No autenticado", ex.getMessage());
@@ -1264,9 +1277,11 @@ class StoryServiceTest {
 
         when(storyRepository.findById(999)).thenReturn(Optional.empty());
 
+        DuplicateStoryRequest request = new DuplicateStoryRequest("Copia");
+
         ResourceNotFoundException ex = assertThrows(
                 ResourceNotFoundException.class,
-                () -> storyService.duplicateStory(999, new DuplicateStoryRequest("Copia"))
+                () -> storyService.duplicateStory(999, request)
         );
 
         assertEquals("Historia no encontrada", ex.getMessage());
