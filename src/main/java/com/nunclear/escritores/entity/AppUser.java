@@ -5,14 +5,14 @@ import com.nunclear.escritores.enums.AccountState;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "app_user")
 @Getter
 @Setter
-public class AppUser extends Auditable {
+public class AppUser {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,25 +56,24 @@ public class AppUser extends Auditable {
     @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
 
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    /**
-     * Initializes the audit timestamps before this entity is persisted.
-     * Delegates to {@link Auditable#onCreate()} to set both
-     * {@code createdAt} and {@code updatedAt}.
-     */
     @PrePersist
     public void prePersist() {
-        super.onCreate();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this
-     * entity. Delegates to {@link Auditable#onUpdate()}.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
 }

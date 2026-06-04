@@ -3,7 +3,7 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Table(name = "story_event")
 @Getter
 @Setter
-public class StoryEvent extends Auditable {
+public class StoryEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,20 +44,21 @@ public class StoryEvent extends Auditable {
     @Column(name = "chapter_id")
     private Integer chapterId;
 
-    /**
-     * Initializes audit timestamps before persisting this event.
-     */
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     public void prePersist() {
-        super.onCreate();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this event.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
-
 }

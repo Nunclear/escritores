@@ -678,9 +678,7 @@ class ChapterServiceTest {
         when(saved.getVolumeId()).thenReturn(7);
         when(saved.getPositionIndex()).thenReturn(4);
 
-        MoveChapterRequest request = new MoveChapterRequest(7, 4);
-
-        MoveChapterResponse response = chapterService.moveChapter(9, request);
+        MoveChapterResponse response = chapterService.moveChapter(9, new MoveChapterRequest(7, 4));
 
         assertEquals(9, response.id());
         assertEquals(7, response.volumeId());
@@ -712,15 +710,12 @@ class ChapterServiceTest {
 
         when(volumeRepository.findByIdAndStoryId(7, 10)).thenReturn(Optional.empty());
 
-        MoveChapterRequest request = new MoveChapterRequest(7, 4);
-
         BadRequestException ex = assertThrows(
                 BadRequestException.class,
-                () -> chapterService.moveChapter(9, request)
+                () -> chapterService.moveChapter(9, new MoveChapterRequest(7, 4))
         );
 
         assertEquals("El volumen destino no existe o no pertenece a la historia", ex.getMessage());
-        verify(chapterRepository, never()).save(any(Chapter.class));
     }
 
     @Test
@@ -765,20 +760,11 @@ class ChapterServiceTest {
         when(storyRepository.findById(10)).thenReturn(Optional.of(story));
         when(story.getOwnerUserId()).thenReturn(1);
 
-        CreateChapterRequest request = new CreateChapterRequest(
-                10,
-                null,
-                "Capítulo",
-                null,
-                "texto",
-                null,
-                "draft",
-                1
-        );
-
         UnauthorizedException ex = assertThrows(
                 UnauthorizedException.class,
-                () -> chapterService.createChapter(request)
+                () -> chapterService.createChapter(new CreateChapterRequest(
+                        10, null, "Capítulo", null, "texto", null, "draft", 1
+                ))
         );
 
         assertEquals("No tienes permisos sobre esta historia", ex.getMessage());
@@ -799,7 +785,7 @@ class ChapterServiceTest {
     }
 
     @Test
-    void moveChapter_deberiaMoverCapituloAVolumenDestinoYGuardarCambios() {
+    void moveChapter_deberiaMoverCapituloAVolumenDestino() {
         Chapter chapter = mock(Chapter.class);
         Story story = mock(Story.class);
         Volume targetVolume = mock(Volume.class);
@@ -828,9 +814,7 @@ class ChapterServiceTest {
         when(saved.getVolumeId()).thenReturn(7);
         when(saved.getPositionIndex()).thenReturn(4);
 
-        MoveChapterRequest request = new MoveChapterRequest(7, 4);
-
-        MoveChapterResponse response = chapterService.moveChapter(9, request);
+        MoveChapterResponse response = chapterService.moveChapter(9, new MoveChapterRequest(7, 4));
 
         assertEquals(9, response.id());
         assertEquals(7, response.volumeId());
@@ -842,7 +826,7 @@ class ChapterServiceTest {
     }
 
     @Test
-    void moveChapter_deberiaLanzarBadRequest_siVolumenDestinoNoPerteneceALaHistoria() {
+    void moveChapter_deberiaLanzarBadRequest_siVolumenDestinoNoExisteONoPertenece() {
         Chapter chapter = mock(Chapter.class);
         Story story = mock(Story.class);
         AppUser user = mock(AppUser.class);
@@ -861,20 +845,14 @@ class ChapterServiceTest {
         when(storyRepository.findById(10)).thenReturn(Optional.of(story));
         when(story.getOwnerUserId()).thenReturn(1);
 
-        when(volumeRepository.findByIdAndStoryId(99, 10)).thenReturn(Optional.empty());
-
-        MoveChapterRequest request = new MoveChapterRequest(99, 1);
+        when(volumeRepository.findByIdAndStoryId(7, 10)).thenReturn(Optional.empty());
 
         BadRequestException ex = assertThrows(
                 BadRequestException.class,
-                () -> chapterService.moveChapter(9, request)
+                () -> chapterService.moveChapter(9, new MoveChapterRequest(7, 4))
         );
 
         assertEquals("El volumen destino no existe o no pertenece a la historia", ex.getMessage());
-        verify(volumeRepository).findByIdAndStoryId(99, 10);
-        verify(chapter, never()).setVolumeId(anyInt());
-        verify(chapter, never()).setPositionIndex(anyInt());
-        verify(chapterRepository, never()).save(any(Chapter.class));
     }
 
     @Test

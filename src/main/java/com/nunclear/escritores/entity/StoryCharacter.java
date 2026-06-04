@@ -3,7 +3,7 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Table(name = "story_character")
 @Getter
 @Setter
-public class StoryCharacter extends Auditable {
+public class StoryCharacter {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,20 +50,21 @@ public class StoryCharacter extends Auditable {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    /**
-     * Initializes audit timestamps before persisting this story character.
-     */
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     public void prePersist() {
-        super.onCreate();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this story character.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
-
 }

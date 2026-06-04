@@ -3,13 +3,14 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "character_skill")
 @Getter
 @Setter
-public class CharacterSkill extends Auditable {
+public class CharacterSkill {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,20 +28,21 @@ public class CharacterSkill extends Auditable {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    /**
-     * Initializes audit timestamps before persisting this character-skill relation.
-     */
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     public void prePersist() {
-        super.onCreate();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this relation.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
-
 }

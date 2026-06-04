@@ -3,14 +3,14 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "global_notice")
 @Getter
 @Setter
-public class GlobalNotice extends Auditable {
+public class GlobalNotice {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,13 +34,17 @@ public class GlobalNotice extends Auditable {
     @Column(name = "archived", nullable = false)
     private Boolean archived = false;
 
-    // createdAt and updatedAt are inherited from Auditable
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @PrePersist
     public void prePersist() {
-        // Initialize audit timestamps
-        super.onCreate();
-        // Set default values if they were not explicitly provided
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
         if (this.isEnabled == null) {
             this.isEnabled = false;
         }
@@ -49,11 +53,8 @@ public class GlobalNotice extends Auditable {
         }
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this notice.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
 }

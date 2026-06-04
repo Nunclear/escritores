@@ -3,14 +3,14 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "content_report")
 @Getter
 @Setter
-public class ContentReport extends Auditable {
+public class ContentReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,23 +46,24 @@ public class ContentReport extends Auditable {
     @Column(name = "resolution_text", columnDefinition = "TEXT")
     private String resolutionText;
 
-    // createdAt and updatedAt are inherited from Auditable
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @PrePersist
     public void prePersist() {
-        // Initialize audit timestamps
-        super.onCreate();
-        // Ensure status has a default value
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
         if (this.statusName == null || this.statusName.isBlank()) {
             this.statusName = "pending";
         }
     }
 
-    /**
-     * Updates the {@code updatedAt} timestamp prior to updating this report.
-     */
     @PreUpdate
     public void preUpdate() {
-        super.onUpdate();
+        this.updatedAt = LocalDateTime.now();
     }
 }

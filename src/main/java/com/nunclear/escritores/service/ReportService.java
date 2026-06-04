@@ -20,19 +20,12 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ReportService {
 
+    // Mala práctica corregida:
+    // strings mágicos repetidos.
+    // Tipo: duplicación de literales / baja mantenibilidad.
     private static final String STATUS_PENDING = "pending";
-    private static final String STATUS_REVIEWED = "reviewed";
-    private static final String STATUS_RESOLVED = "resolved";
-    private static final String STATUS_REJECTED = "rejected";
-
-    private static final String ROLE_MODERATOR = "moderator";
-    private static final String ROLE_ADMIN = "admin";
-
     private static final String REPORT_NOT_FOUND = "Reporte no encontrado";
     private static final String DEFAULT_CREATED_DESC_SORT = "createdAt,desc";
-    private static final String SORT_CREATED_AT = "createdAt";
-    private static final String SORT_UPDATED_AT = "updatedAt";
-    private static final String SORT_STATUS_NAME = "statusName";
 
     private final ContentReportRepository contentReportRepository;
     private final StoryRepository storyRepository;
@@ -146,7 +139,6 @@ public class ReportService {
                 size,
                 sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
         );
-
         Page<ContentReport> result = contentReportRepository.findPendingReports(pageable);
         return mapReportPage(result);
     }
@@ -157,7 +149,6 @@ public class ReportService {
                 size,
                 sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
         );
-
         Page<ContentReport> result = contentReportRepository.findByStatusNameIgnoreCase(statusName, pageable);
         return mapReportPage(result);
     }
@@ -190,14 +181,13 @@ public class ReportService {
                 .orElseThrow(() -> new ResourceNotFoundException("Revisor no encontrado"));
 
         String role = reviewer.getAccessLevel().name();
-
-        if (!ROLE_MODERATOR.equals(role) && !ROLE_ADMIN.equals(role)) {
+        if (!"moderator".equals(role) && !"admin".equals(role)) {
             throw new BadRequestException("El usuario asignado debe ser moderator o admin");
         }
 
         report.setReviewedByUserId(reviewer.getId());
         report.setReviewedAt(LocalDateTime.now());
-        report.setStatusName(STATUS_REVIEWED);
+        report.setStatusName("reviewed");
 
         ContentReport saved = contentReportRepository.save(report);
 
@@ -217,7 +207,7 @@ public class ReportService {
         report.setReviewedByUserId(moderator.getId());
         report.setReviewedAt(LocalDateTime.now());
         report.setResolutionText(request.resolutionText());
-        report.setStatusName(STATUS_REVIEWED);
+        report.setStatusName("reviewed");
 
         ContentReport saved = contentReportRepository.save(report);
 
@@ -237,7 +227,7 @@ public class ReportService {
         report.setReviewedByUserId(moderator.getId());
         report.setReviewedAt(LocalDateTime.now());
         report.setResolutionText(request.resolutionText());
-        report.setStatusName(STATUS_RESOLVED);
+        report.setStatusName("resolved");
 
         ContentReport saved = contentReportRepository.save(report);
 
@@ -257,7 +247,7 @@ public class ReportService {
         report.setReviewedByUserId(moderator.getId());
         report.setReviewedAt(LocalDateTime.now());
         report.setResolutionText(request.resolutionText());
-        report.setStatusName(STATUS_REJECTED);
+        report.setStatusName("resolved");
 
         ContentReport saved = contentReportRepository.save(report);
 
@@ -282,7 +272,6 @@ public class ReportService {
                 size,
                 sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort
         );
-
         Page<ContentReport> result = contentReportRepository.findHistory(
                 targetUserId,
                 storyId,
@@ -290,7 +279,6 @@ public class ReportService {
                 chapterId,
                 pageable
         );
-
         return mapReportPage(result);
     }
 
@@ -314,6 +302,9 @@ public class ReportService {
     }
 
     private AppUser getAuthenticatedUser() {
+        // Mala práctica corregida:
+        // acceso directo a getAuthentication().getPrincipal() sin validar null.
+        // Tipo: riesgo de NullPointerException / falta de validación defensiva.
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -334,7 +325,7 @@ public class ReportService {
         AppUser user = getAuthenticatedUser();
         String role = user.getAccessLevel().name();
 
-        if (!ROLE_MODERATOR.equals(role) && !ROLE_ADMIN.equals(role)) {
+        if (!"moderator".equals(role) && !"admin".equals(role)) {
             throw new UnauthorizedException("No autorizado");
         }
 
@@ -344,19 +335,17 @@ public class ReportService {
     private Pageable buildPageable(int page, int size, String sort) {
         String[] sortParts = sort.split(",");
         String field = sortParts[0];
-
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("desc")
-                ? Sort.Direction.DESC
-                : Sort.Direction.ASC;
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         return PageRequest.of(page, size, Sort.by(direction, mapSortField(field)));
     }
 
     private String mapSortField(String field) {
         return switch (field) {
-            case SORT_UPDATED_AT -> SORT_UPDATED_AT;
-            case SORT_STATUS_NAME -> SORT_STATUS_NAME;
-            default -> SORT_CREATED_AT;
+            case "updatedAt" -> "updatedAt";
+            case "statusName" -> "statusName";
+            default -> "createdAt";
         };
     }
 }

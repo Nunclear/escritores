@@ -3,7 +3,6 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import com.nunclear.escritores.entity.Auditable;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "story_comment")
 @Getter
 @Setter
-public class StoryComment extends Auditable {
+public class StoryComment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,6 +46,7 @@ public class StoryComment extends Auditable {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
@@ -56,6 +56,7 @@ public class StoryComment extends Auditable {
         }
     }
 
+    @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }

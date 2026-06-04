@@ -70,6 +70,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.3</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -88,17 +95,6 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>2.21.2</version>
-        </dependency>
-
-        <!-- Add the JSR310 Java Time module for Jackson to handle Java 8/21
-             date/time types such as LocalDate and LocalDateTime.  Without
-             this module, SpringDoc and other components may fail to load
-             because they cannot find the {@code JavaTimeModule} class at
-             runtime.  This dependency ensures that the module is on the
-             classpath and is auto-registered by Spring Boot. -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
         <dependency>
@@ -126,22 +122,6 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <!-- Swagger/OpenAPI documentation -->
-        <!--
-         Use springdoc-openapi v3 when running on Spring Boot 4.
-         The 3.x line of springdoc-openapi is compatible with Spring Boot 4,
-         Java 21+ and OpenAPI 3.1, and resolves missing class exceptions such
-         as the `WebMvcProperties` error observed with version 2.x.  See the
-         Springdoc OpenAPI compatibility matrix and blog posts for details【797650817932488†screenshot】.
-         This dependency brings Swagger UI at `/swagger-ui.html` and the
-         OpenAPI specification endpoints `/v3/api-docs` and `/v3/api-docs.yaml`.
-         -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.0.3</version>
         </dependency>
 
         <dependency>
