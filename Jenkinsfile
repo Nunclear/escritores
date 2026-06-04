@@ -19,7 +19,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                chmod +x mvnw
+                sh 'chmod +x mvnw'
                 sh './mvnw test -Dmaven.test.failure.ignore=true'
             }
         }
