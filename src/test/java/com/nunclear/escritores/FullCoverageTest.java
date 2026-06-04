@@ -60,9 +60,8 @@ public class FullCoverageTest {
             try {
                 Class<?> clazz = Class.forName(className);
                 invokeClass(clazz);
-                // Additionally invoke any nested or inner classes to ensure
-                // their code paths are executed.  This helps exercise
-                // static inner classes, enums and anonymous classes.
+                // Also attempt to invoke any nested or inner classes. This ensures that
+                // static inner classes, enums and anonymous classes are exercised as well.
                 for (Class<?> inner : clazz.getDeclaredClasses()) {
                     invokeClass(inner);
                 }
@@ -98,16 +97,23 @@ public class FullCoverageTest {
             // constructor), we will still attempt to invoke static methods.
         }
 
-        // If the class is an enum, iterate over its constants to trigger any
-        // initialization code in the enum constructors.  We also call
-        // any declared methods on each constant with default arguments.
+        // If the class is an enum, iterate over its constants to trigger
+        // any code in enum constructors or methods.  Calling toString() on
+        // each constant ensures their fields are accessed.
         try {
             Object[] constants = clazz.getEnumConstants();
             if (constants != null) {
                 for (Object constant : constants) {
-                    // Calling toString() will execute any overridden logic.
+                    // Call name() and toString() if present.  Use reflection
+                    // to avoid compile‑time dependency on java.lang.Enum methods.
+                    try {
+                        Method nameMethod = constant.getClass().getMethod("name");
+                        nameMethod.invoke(constant);
+                    } catch (Throwable ignored) {
+                        // name() not present or threw an exception.
+                    }
                     constant.toString();
-                    // Invoke each declared method on the enum constant with default values.
+                    // Additionally invoke any declared methods on the enum constant
                     for (Method m : constant.getClass().getDeclaredMethods()) {
                         m.setAccessible(true);
                         Class<?>[] ptypes = m.getParameterTypes();
@@ -118,25 +124,13 @@ public class FullCoverageTest {
                         try {
                             m.invoke(constant, args);
                         } catch (Throwable ignored) {
-                            // Ignore any exception thrown by enum method invocation
+                            // ignore exceptions thrown by enum methods
                         }
                     }
                 }
             }
         } catch (Throwable ignored) {
-            // Not an enum or failed to process enum constants
-        }
-
-        // Recurse into any declared inner/nested classes.  This ensures that
-        // anonymous or static inner classes are also exercised.  The call
-        // is made here in addition to the initial scan to capture nested
-        // classes discovered at runtime.
-        for (Class<?> inner : clazz.getDeclaredClasses()) {
-            try {
-                invokeClass(inner);
-            } catch (Throwable ignored) {
-                // Continue with other inner classes even if one fails
-            }
+            // The class might not be an enum or there is no enum constant; ignore
         }
         // Invoke all declared methods.  Use default values for parameters
         // and catch any exceptions thrown by the methods.

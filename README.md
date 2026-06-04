@@ -301,6 +301,35 @@ Para ejecutar las pruebas unitarias:
 mvn test
 ```
 
+## Pruebas de carga con k6
+
+Además de las pruebas unitarias, el proyecto incluye un script de **k6** para medir el rendimiento de la API. k6 es una herramienta de pruebas de carga de código abierto desarrollada por Grafana Labs, diseñada para evaluar el comportamiento de un servicio bajo distintos niveles de concurrencia【91227551196018†L63-L68】. Los scripts de k6 se escriben en JavaScript y se ejecutan con el comando `k6 run archivo.js`【91227551196018†L124-L144】.
+
+### Configuración
+
+1. **Instalar k6:**
+   - Consulta la documentación oficial de k6 para instalar el binario en tu sistema (Linux, macOS o Windows).
+   - Alternativamente, utiliza la imagen oficial de Docker: `docker pull grafana/k6`.
+
+2. **Definir la URL base:**
+   - El script utiliza `http://localhost:8080` como valor por defecto. Puedes sobreescribirlo con la variable de entorno `BASE_URL` al ejecutar la prueba.
+
+### Ejecutar la prueba
+
+El script de k6 se encuentra en `k6/api-load-test.js`. Ejecuta la prueba con uno de estos métodos:
+
+```bash
+# Usando k6 instalado en el sistema
+k6 run k6/api-load-test.js
+
+# Usando Docker (sin instalar k6 en tu máquina)
+docker run --rm -i grafana/k6 run - < k6/api-load-test.js
+```
+
+El script por defecto genera una carga escalonada de 5 a 15 usuarios virtuales y realiza peticiones a los endpoints públicos `/stories`, `/v3/api-docs`, `/metrics/stories/top-viewed` y `POST /auth/login`. Puedes ajustar las etapas y los usuarios modificando la propiedad `options.stages` en el archivo `k6/api-load-test.js`.
+
+Al finalizar la ejecución, k6 mostrará un resumen de métricas como el número de peticiones, tiempos de respuesta y porcentaje de errores. Consulta la [documentación de k6](https://k6.io/docs/) para más opciones y configuraciones.
+
 ## Logs
 
 Los logs se configuran en `application.properties`. Por defecto:
