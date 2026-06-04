@@ -13,12 +13,13 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout +x scm
+                checkout scm
             }
         }
 
         stage('Test') {
             steps {
+                chmod +x mvnw
                 sh './mvnw test -Dmaven.test.failure.ignore=true'
             }
         }
