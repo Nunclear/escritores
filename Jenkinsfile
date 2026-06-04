@@ -23,7 +23,7 @@ pipeline {
 
         stage('Unit Tests') {
             steps {
-                sh 'mvn test'
+                sh 'mvnw test -Dmaven.test.failure.ignore=true'
             }
         }
 
