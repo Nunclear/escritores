@@ -96,13 +96,7 @@ public class SecurityConfig {
                         .requestMatchers("/sanctions/**").authenticated()
                         .requestMatchers("/moderation/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
-                        ).permitAll() // Permite el acceso libre a Swagger
                         .anyRequest().authenticated()
-
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

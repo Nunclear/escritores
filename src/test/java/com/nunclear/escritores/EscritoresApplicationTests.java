@@ -8,6 +8,8 @@ class EscritoresApplicationTests {
 
     @Test
     void contextLoads() {
+        // This test intentionally has no assertions because @SpringBootTest
+        // verifies that the Spring application context loads successfully.
     }
 
 }
