@@ -31,14 +31,6 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Expose Swagger/OpenAPI endpoints without authentication
-                        .requestMatchers(
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs",
-                                "/v3/api-docs.yaml",
-                                "/v3/api-docs/**"
-                        ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/auth/register",
@@ -104,7 +96,13 @@ public class SecurityConfig {
                         .requestMatchers("/sanctions/**").authenticated()
                         .requestMatchers("/moderation/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll() // Permite el acceso libre a Swagger
                         .anyRequest().authenticated()
+
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
