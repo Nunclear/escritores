@@ -16,10 +16,15 @@ pipeline {
                 checkout scm
             }
         }
-
+        stage('Prepare') {
+            steps {
+                sh 'chmod +x mvnw'
+            }
+        }
+        
         stage('Test') {
             steps {
-                sh './mvnw +x test'
+                sh './mvnw test'
             }
         }
 
