@@ -31,6 +31,13 @@ public class EmailVerificationToken {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // Soft delete flag for tokens
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

@@ -59,10 +59,10 @@ public class ArcService {
     }
 
     public ArcDetailResponse getArcById(Integer id) {
-        Arc arc = arcRepository.findById(id)
+        Arc arc = arcRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Arco no encontrado"));
 
-        Story story = storyRepository.findById(arc.getStoryId())
+        Story story = storyRepository.findByIdAndDeletedFalse(arc.getStoryId())
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
@@ -77,7 +77,7 @@ public class ArcService {
     }
 
     public PageResponse<ArcListItemResponse> getArcsByStory(Integer storyId, int page, int size, String sort) {
-        Story story = storyRepository.findById(storyId)
+        Story story = storyRepository.findByIdAndDeletedFalse(storyId)
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
@@ -88,7 +88,7 @@ public class ArcService {
                 sort == null || sort.isBlank() ? SORT_POSITION_INDEX + ",asc" : sort
         );
 
-        Page<Arc> result = arcRepository.findByStoryId(storyId, pageable);
+        Page<Arc> result = arcRepository.findByStoryIdAndDeletedFalse(storyId, pageable);
 
         return new PageResponse<>(
                 result.getContent().stream()
@@ -146,12 +146,15 @@ public class ArcService {
 
     public MessageResponse deleteArc(Integer id) {
         Arc arc = getEditableArc(id);
-        arcRepository.delete(arc);
+        // Perform logical delete by marking the arc as deleted
+        arc.setDeleted(true);
+        arc.setDeletedAt(java.time.LocalDateTime.now());
+        arcRepository.save(arc);
         return new MessageResponse("Arco eliminado correctamente");
     }
 
     private Arc getEditableArc(Integer id) {
-        Arc arc = arcRepository.findById(id)
+        Arc arc = arcRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Arco no encontrado"));
 
         getEditableStory(arc.getStoryId());
@@ -159,7 +162,7 @@ public class ArcService {
     }
 
     private Story getEditableStory(Integer storyId) {
-        Story story = storyRepository.findById(storyId)
+        Story story = storyRepository.findByIdAndDeletedFalse(storyId)
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();

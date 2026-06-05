@@ -78,7 +78,7 @@ public class StoryService {
     }
 
     public StoryDetailResponse getStoryById(Integer id) {
-        Story story = storyRepository.findById(id)
+        Story story = storyRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
@@ -95,7 +95,7 @@ public class StoryService {
     }
 
     public StorySlugResponse getStoryBySlug(String slug) {
-        Story story = storyRepository.findBySlugText(slug)
+        Story story = storyRepository.findBySlugTextAndDeletedFalse(slug)
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         validateReadAccess(story);
@@ -110,11 +110,12 @@ public class StoryService {
     public PageResponse<StoryListItemResponse> listPublicStories(int page, int size, String sort) {
         Pageable pageable = buildPageable(page, size, sort == null || sort.isBlank() ? DEFAULT_CREATED_DESC_SORT : sort);
 
-        Page<Story> result = storyRepository.findByVisibilityStateIgnoreCaseAndPublicationStateIgnoreCaseAndArchivedAtIsNull(
-                VISIBILITY_PUBLIC,
-                PUBLICATION_PUBLISHED,
-                pageable
-        );
+        Page<Story> result = storyRepository
+                .findByVisibilityStateIgnoreCaseAndPublicationStateIgnoreCaseAndArchivedAtIsNullAndDeletedFalse(
+                        VISIBILITY_PUBLIC,
+                        PUBLICATION_PUBLISHED,
+                        pageable
+                );
 
         return new PageResponse<>(
                 result.getContent().stream()
@@ -365,12 +366,15 @@ public class StoryService {
 
     public MessageResponse deleteStory(Integer id) {
         Story story = getEditableStory(id);
-        storyRepository.delete(story);
+        // Perform a logical delete instead of physically removing the entity
+        story.setDeleted(true);
+        story.setDeletedAt(LocalDateTime.now());
+        storyRepository.save(story);
         return new MessageResponse("Historia eliminada correctamente");
     }
 
     private Story getEditableStory(Integer id) {
-        Story story = storyRepository.findById(id)
+        Story story = storyRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(STORY_NOT_FOUND));
 
         AppUser currentUser = getAuthenticatedUser();

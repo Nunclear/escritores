@@ -65,6 +65,10 @@ public class AppUser {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // Soft delete flag for user accounts
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted = false;
+
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();

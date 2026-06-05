@@ -35,8 +35,12 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/v3/api-docs/**"
-                        ).permitAll()
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml",
+                                "/openapi-doc_api.json",
+                                "/webjars/**",
+                                "/favicon.ico"
+                                ).permitAll()
                         .requestMatchers(
                                 "/auth/register",
                                 "/auth/login",
@@ -102,7 +106,6 @@ public class SecurityConfig {
                         .requestMatchers("/moderation/**").authenticated()
                         .requestMatchers("/admin/**").authenticated()
                         .anyRequest().authenticated()
-
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

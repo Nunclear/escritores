@@ -34,6 +34,13 @@ public class Arc {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Soft delete flag and timestamp
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
