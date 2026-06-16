@@ -3,6 +3,8 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
@@ -13,6 +15,8 @@ import java.time.LocalDateTime;
                 @UniqueConstraint(name = "uniq_favorite_story", columnNames = {"user_id", "story_id"})
         }
 )
+@SQLDelete(sql = "UPDATE story_favorite SET deleted = true, deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 public class StoryFavorite {
@@ -30,8 +34,18 @@ public class StoryFavorite {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+
+    @Column(name = "deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     public void prePersist() {
+        if (this.deleted == null) {
+            this.deleted = false;
+        }
         this.createdAt = LocalDateTime.now();
     }
 }

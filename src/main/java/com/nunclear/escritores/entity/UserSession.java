@@ -3,11 +3,15 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_session")
+@SQLDelete(sql = "UPDATE user_session SET deleted = true, deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 public class UserSession {
@@ -43,8 +47,18 @@ public class UserSession {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+
+    @Column(name = "deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     public void prePersist() {
+        if (this.deleted == null) {
+            this.deleted = false;
+        }
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;

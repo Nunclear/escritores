@@ -189,6 +189,7 @@ public class UserService {
         AppUser user = getAuthenticatedUser();
 
         user.setAccountState(AccountState.banned);
+        user.setDeleted(true);
         user.setDeletedAt(LocalDateTime.now());
         appUserRepository.save(user);
 

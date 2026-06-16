@@ -39,7 +39,8 @@ public class SecurityConfig {
                                 "/v3/api-docs.yaml",
                                 "/openapi-doc_api.json",
                                 "/webjars/**",
-                                "/favicon.ico"
+                                "/favicon.ico",
+                                "/admin/auditoria.html"
                                 ).permitAll()
                         .requestMatchers(
                                 "/auth/register",
