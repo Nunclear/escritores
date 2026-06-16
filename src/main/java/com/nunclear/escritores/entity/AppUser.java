@@ -5,11 +5,15 @@ import com.nunclear.escritores.enums.AccountState;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "app_user")
+@SQLDelete(sql = "UPDATE app_user SET deleted = true, deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 public class AppUser {
@@ -66,11 +70,14 @@ public class AppUser {
     private LocalDateTime deletedAt;
 
     // Soft delete flag for user accounts
-    @Column(name = "deleted", nullable = false)
+    @Column(name = "deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private Boolean deleted = false;
 
     @PrePersist
     public void prePersist() {
+        if (this.deleted == null) {
+            this.deleted = false;
+        }
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;

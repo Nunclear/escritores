@@ -3,11 +3,15 @@ package com.nunclear.escritores.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "email_verification_token")
+@SQLDelete(sql = "UPDATE email_verification_token SET deleted = true, deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 public class EmailVerificationToken {
@@ -32,7 +36,7 @@ public class EmailVerificationToken {
     private LocalDateTime createdAt;
 
     // Soft delete flag for tokens
-    @Column(name = "deleted", nullable = false)
+    @Column(name = "deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private Boolean deleted = false;
 
     @Column(name = "deleted_at")
@@ -40,6 +44,9 @@ public class EmailVerificationToken {
 
     @PrePersist
     public void prePersist() {
+        if (this.deleted == null) {
+            this.deleted = false;
+        }
         this.createdAt = LocalDateTime.now();
     }
 }

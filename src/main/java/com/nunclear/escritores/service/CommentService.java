@@ -212,6 +212,7 @@ public class CommentService {
 
         validateCanEditComment(comment);
 
+        comment.setDeleted(true);
         comment.setDeletedAt(LocalDateTime.now());
         comment.setVisibilityState(VISIBILITY_DELETED);
         storyCommentRepository.save(comment);
